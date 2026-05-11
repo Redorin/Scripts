@@ -27,6 +27,8 @@ public class ConduitResettable : MonoBehaviour
             if (AdminDialogue.Instance != null)
                 AdminDialogue.Instance.AdminInfo(
                     "Conduit restored. Power path clear.");
+
+                    Chapter1Objectives.Instance?.Complete_ResetConduit();
         }
         else
         {

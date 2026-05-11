@@ -35,6 +35,7 @@ public class KeySpawner : MonoBehaviour
             keyObject.transform.position = transform.position + spawnOffset;
             keyObject.SetActive(true);
         }
+        Chapter1Objectives.Instance?.Complete_GetArchiveKey();
 
         if (AdminDialogue.Instance != null)
             AdminDialogue.Instance.AdminInfo(spawnMessage);

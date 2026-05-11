@@ -28,16 +28,21 @@ public class CableConnectionPuzzleManager : MonoBehaviour
     private bool cablesComplete = false;
     private int currentBootStep = 0;
 
-    // Called by each CableConnectionPuzzle when it connects
+    private int connectionsComplete = 0;
+
+    // Called by each CableConnectionPuzzle when it connects to a WallPlug
     public void OnCableConnected()
     {
         if (cablesComplete) return;
 
-        // Check if all cables are connected
-        foreach (CableConnectionPuzzle cable in cables)
-            if (!cable.isConnected) return;
+        connectionsComplete++;
+
+        // Check if all cables needed are connected
+        int required = cables != null ? cables.Length : 2;
+        if (connectionsComplete < required) return;
 
         cablesComplete = true;
+        Chapter1Objectives.Instance?.Complete_ConnectCables();
 
         // Enable server terminals
         foreach (ServerTerminal server in servers)
@@ -56,6 +61,7 @@ public class CableConnectionPuzzleManager : MonoBehaviour
         // Check if this is the correct next server
         if (servers[currentBootStep] == server)
         {
+            server.SetOnline(); // light goes green immediately on correct boot
             currentBootStep++;
 
             if (AdminDialogue.Instance != null)
@@ -84,6 +90,7 @@ public class CableConnectionPuzzleManager : MonoBehaviour
     void SolvePuzzle()
     {
         isSolved = true;
+        Chapter1Objectives.Instance?.Complete_BootServers(); 
 
         // Lift server room lockdown and spawn archive key
         if (lockdown != null)

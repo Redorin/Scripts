@@ -1,19 +1,21 @@
 using UnityEngine;
 
 // Attach to the override panel in the maintenance room.
-// Becomes usable only after server room puzzle is solved.
+// Requires server room puzzle complete AND archive room visited.
 // Removes the barricade blocking the 4th floor stairs.
 
 public class MaintenanceOverridePanel : MonoBehaviour
 {
     [Header("References")]
-    public GameObject barricade;                        // barricade blocking 4th floor stairs
-    public CableConnectionPuzzleManager serverPuzzle;   // check if server room is done
+    public GameObject barricade;
+    public CableConnectionPuzzleManager serverPuzzle;
+    public ArchiveRoomTracker archiveTracker;       // player must visit archive first
 
     [Header("Dialogue")]
-    public string notReadyMessage    = "Override panel — locked. Complete server room diagnostics first.";
-    public string activateMessage    = "Maintenance override activated. 4th floor access restored.";
-    public string alreadyDoneMessage = "4th floor access already restored.";
+    public string notReadyMessage     = "Override panel — locked. Complete server room diagnostics first.";
+    public string archiveFirstMessage = "Override panel — locked. Check the archive room first.";
+    public string activateMessage     = "Maintenance override activated. 4th floor access restored.";
+    public string alreadyDoneMessage  = "4th floor access already restored.";
 
     [Header("State")]
     public bool isActivated = false;
@@ -27,11 +29,19 @@ public class MaintenanceOverridePanel : MonoBehaviour
             return;
         }
 
-        // Only usable after server room puzzle is complete
+        // Step 1 — server room must be done first
         if (serverPuzzle == null || !serverPuzzle.isSolved)
         {
             if (AdminDialogue.Instance != null)
                 AdminDialogue.Instance.AdminWarning(notReadyMessage);
+            return;
+        }
+
+        // Step 2 — player must have visited archive room
+        if (archiveTracker == null || !archiveTracker.hasVisited)
+        {
+            if (AdminDialogue.Instance != null)
+                AdminDialogue.Instance.AdminWarning(archiveFirstMessage);
             return;
         }
 
@@ -41,8 +51,8 @@ public class MaintenanceOverridePanel : MonoBehaviour
     void Activate()
     {
         isActivated = true;
+        Chapter1Objectives.Instance?.Complete_OverridePanel();
 
-        // Remove barricade
         if (barricade != null)
             barricade.SetActive(false);
 

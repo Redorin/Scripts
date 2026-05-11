@@ -47,9 +47,11 @@ public class CableConnectionPuzzle : MonoBehaviour
 
         if (holdable != null)
             holdable.enabled = true;
+        
 
         UpdateVisual();
-
+        
+            Chapter1Objectives.Instance?.Complete_ResetBurntSocket();
         if (AdminDialogue.Instance != null)
             AdminDialogue.Instance.AdminInfo(
                 cableName + " restored. Pick it up and plug it in.");
@@ -75,17 +77,23 @@ public class CableConnectionPuzzle : MonoBehaviour
         isConnected = true;
         wallPlug.Fill(this);
 
-        // Snap socket to wall plug and detach from player
+        // Remove from player inventory first
+        GameObject player = GameObject.FindWithTag("Player");
+        if (player != null)
+        {
+            ItemHolder itemHolder = player.GetComponent<ItemHolder>();
+            if (itemHolder != null)
+                itemHolder.RemoveItemByName(holdable.itemName);
+        }
+
+        // Snap socket to wall plug
         transform.SetParent(wallPlug.transform);
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
 
         // Disable holdable — now fixed in wall
         if (holdable != null)
-        {
-            holdable.Drop();
             holdable.enabled = false;
-        }
 
         // Disable collider so player doesn't re-interact
         Collider col = GetComponent<Collider>();

@@ -143,7 +143,7 @@ public class PlayerInteraction : MonoBehaviour
             if (obj != null) { SetOnly(obj: obj); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
 
             HoldableItem holdable = hit.collider.GetComponent<HoldableItem>();
-            if (holdable != null && !holdable.IsBeingHeld()) { SetOnly(holdable: holdable); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (holdable != null && !holdable.IsBeingHeld() && holdable.enabled) { SetOnly(holdable: holdable); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
 
             LightSwitchToggle lightSwitch = hit.collider
                 .GetComponent<LightSwitchToggle>();
@@ -244,15 +244,6 @@ public class PlayerInteraction : MonoBehaviour
 
     void ClearAll() { SetOnly(); }
 
-    public void RestoreUI()
-{
-    if (crosshairText != null)
-        crosshairText.text = normalCrosshair;
-
-    if (interactionTooltip != null)
-        interactionTooltip.gameObject.SetActive(false);
-}
-
     void SetCrosshairNormal()
     {
         if (crosshairText == null) return;
@@ -260,14 +251,6 @@ public class PlayerInteraction : MonoBehaviour
         crosshairText.color = normalColor;
         crosshairText.fontSize = normalSize;
     }
-    public void HideUI()
-{
-    if (interactionTooltip != null)
-        interactionTooltip.gameObject.SetActive(false);
-
-    if (crosshairText != null)
-        crosshairText.text = "";
-}
 
     void SetCrosshairInteract()
     {

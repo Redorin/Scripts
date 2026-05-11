@@ -28,6 +28,7 @@ public class ArchiveRoomTracker : MonoBehaviour
         if (!other.CompareTag("Player")) return;
 
         hasVisited = true;
+        Chapter1Objectives.Instance?.Complete_AccessArchive();
 
         if (AdminDialogue.Instance != null)
             foreach (string line in firstVisitDialogue)

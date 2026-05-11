@@ -8,12 +8,13 @@ public class ServerTerminal : MonoBehaviour
     [Header("State")]
     public bool isInteractable = false;
     public bool isBooted = false;
+    public bool isOnline = false;
 
     [Header("Visual")]
     public Renderer statusLight;
-    public Color offColor      = Color.red;
-    public Color bootingColor  = Color.yellow;
-    public Color onlineColor   = Color.green;
+    public Color offColor     = Color.red;
+    public Color bootingColor = Color.yellow;
+    public Color onlineColor  = Color.green;
 
     [Header("Dialogue")]
     public string notReadyMessage  = "Server offline. Connect cables first.";
@@ -44,8 +45,12 @@ public class ServerTerminal : MonoBehaviour
 
         if (isBooted)
         {
+            // Different message if fully online vs just booted in wrong order
+            string msg = isOnline
+                ? serverName + " — already online."
+                : alreadyOnMessage;
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminInfo(alreadyOnMessage);
+                AdminDialogue.Instance.AdminInfo(msg);
             return;
         }
 
@@ -63,12 +68,14 @@ public class ServerTerminal : MonoBehaviour
     public void ResetBoot()
     {
         isBooted = false;
+        isOnline = false;
         UpdateVisual(offColor);
     }
 
     // Called by manager when this server is confirmed online
     public void SetOnline()
     {
+        isOnline = true;
         UpdateVisual(onlineColor);
     }
 

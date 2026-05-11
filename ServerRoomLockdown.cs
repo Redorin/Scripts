@@ -44,6 +44,10 @@ public class ServerRoomLockdown : MonoBehaviour
         if (exitDoor != null) exitDoor.enabled = false;
         if (keycardDoor != null) keycardDoor.isUnlocked = false;
 
+        Chapter1Objectives.Instance?.Complete_FindKeycard(); // completes "access server room"
+    Chapter1Objectives.Instance?.AddObjective_ServerRoom(); // ← ADD THIS
+    Chapter1Objectives.Instance?.AddObjective_ResetBurntSocket(); // ← ADD THIS
+
         if (AdminDialogue.Instance != null)
         {
             AdminDialogue.Instance.AdminWarning(lockdownMessage);

@@ -84,6 +84,7 @@ public class BreakerPanelPuzzle : MonoBehaviour
     void PuzzleSolved()
     {
         puzzleSolved = true;
+        Chapter1Objectives.Instance?.Complete_Breakers();
 
         if (fuseBox != null)
             fuseBox.PowerOn();

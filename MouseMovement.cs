@@ -3,15 +3,14 @@ using UnityEngine.InputSystem;
 
 public class MouseMovement : MonoBehaviour
 {
-    public float mouseSensitivity = 100f;
+    public float mouseSensitivity = 0.15f;  // Lowered — no longer multiplied by Time.deltaTime
+
     public Transform mainCamera;
 
     float xRotation = 0f;
 
     public float topClamp = -90f;
     public float bottomClamp = 90f;
-
-    private Vector2 mouseDelta;
 
     void Start()
     {
@@ -20,10 +19,16 @@ public class MouseMovement : MonoBehaviour
 
     void Update()
     {
-        mouseDelta = Mouse.current.delta.ReadValue();
+        if (Mouse.current == null) return;
 
-        float mouseX = mouseDelta.x * mouseSensitivity * Time.deltaTime;
-        float mouseY = mouseDelta.y * mouseSensitivity * Time.deltaTime;
+        // Don't move camera when cursor is unlocked (paused)
+        if (Cursor.lockState != CursorLockMode.Locked) return;
+
+        // ReadUnprocessedValue() bypasses OS mouse acceleration and smoothing
+        Vector2 mouseDelta = Mouse.current.delta.ReadUnprocessedValue();
+
+        float mouseX = mouseDelta.x * mouseSensitivity;
+        float mouseY = mouseDelta.y * mouseSensitivity;
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, topClamp, bottomClamp);

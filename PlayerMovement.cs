@@ -103,4 +103,20 @@ public class PlayerMovement : MonoBehaviour
 
     public bool IsMoving() => isMoving;
     public bool IsGrounded() => isGrounded;
+
+    private void OnControllerColliderHit(ControllerColliderHit hit)
+{
+    Rigidbody rb = hit.collider.attachedRigidbody;
+
+    // No rigidbody = do nothing
+    if (rb == null)
+        return;
+
+    // Ignore kinematic rigidbodies
+    if (rb.isKinematic)
+        return;
+
+    // Prevent pushing objects
+    rb.linearVelocity = Vector3.zero;
+}
 }

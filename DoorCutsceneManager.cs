@@ -6,6 +6,7 @@ public class DoorCutsceneManager : MonoBehaviour
     [Header("References")]
     public Transform playerCamera;
     public Transform playerBody;
+    public Transform playerRoot;
     public Transform doorKnob;
     public Transform doorTarget;
     public Transform resetItemTransform;
@@ -25,7 +26,6 @@ public class DoorCutsceneManager : MonoBehaviour
 
     [Header("-- STEP 1: Look At Door Handle --")]
     public float lookAtHandleDuration = 0.8f;
-    public Vector3 lookAtHandleAngle = new Vector3(10f, 0f, 0f);
 
     [Header("-- STEP 2: Step Forward --")]
     public float stepForwardDistance = 0.6f;
@@ -33,11 +33,11 @@ public class DoorCutsceneManager : MonoBehaviour
     public float stepDelay = 0.3f;
 
     [Header("-- STEP 3: Look Up Before Debris --")]
-    public float lookUpDuration = 0.5f;
-    public Vector3 lookUpAngle = new Vector3(-20f, 0f, 0f);
+    public float lookUpDuration = 1.0f;
+    public Vector3 lookUpAngle = new Vector3(-30f, 0f, 0f);
 
     [Header("-- STEP 4: Debris Falls --")]
-    public float debrisWaitBeforeLook = 0.3f;
+    public float debrisWaitBeforeLook = 0.2f;
 
     [Header("-- STEP 5: Look Away In Shock --")]
     public float lookAwayDuration = 0.3f;
@@ -56,6 +56,9 @@ public class DoorCutsceneManager : MonoBehaviour
     [Header("-- STEP 8: End --")]
     public float endHoldDuration = 0.5f;
 
+    [Header("Controls UI")]
+    public ControlsUI controlsUI;
+
     private bool isPlaying = false;
 
     public void TriggerCutscene()
@@ -69,7 +72,6 @@ public class DoorCutsceneManager : MonoBehaviour
         isPlaying = true;
         hasPlayed = true;
 
-        // Disable player
         DisablePlayer();
 
         // ── STEP 0: Reposition player in front of door ──
@@ -79,31 +81,32 @@ public class DoorCutsceneManager : MonoBehaviour
                 playerStartPosition.rotation,
                 repositionDuration));
 
-        // Small settle delay
         yield return new WaitForSeconds(0.1f);
 
-        // ── STEP 1: Look at door handle ──
+        // ── STEP 1: Look at door handle in world space ──
         yield return StartCoroutine(
-            RotateCamera(lookAtHandleAngle, lookAtHandleDuration));
+            LookAtTarget(doorKnob.position, lookAtHandleDuration));
 
-        // ── STEP 2: Open door then step forward ──
+        // ── STEP 2: Open door + look forward + step simultaneously ──
         if (door != null)
             door.Interact();
 
         yield return new WaitForSeconds(stepDelay);
 
+        // Look forward and step at the same time
+        StartCoroutine(RotateCamera(Vector3.zero, stepForwardDuration));
         yield return StartCoroutine(
             StepForward(stepForwardDistance, stepForwardDuration));
 
-        // ── STEP 3: Look up slightly ──
-        yield return StartCoroutine(
-            RotateCamera(lookUpAngle, lookUpDuration));
+        // ── STEP 3 + 4: Look up AND trigger debris simultaneously ──
+        StartCoroutine(RotateCamera(lookUpAngle, lookUpDuration));
 
-        // ── STEP 4: Trigger debris ──
         yield return new WaitForSeconds(debrisWaitBeforeLook);
 
         if (ceilingCollapse != null)
             ceilingCollapse.TriggerCollapse();
+
+        yield return new WaitForSeconds(lookUpDuration - debrisWaitBeforeLook);
 
         // ── STEP 5: Look away in shock ──
         yield return StartCoroutine(
@@ -119,10 +122,8 @@ public class DoorCutsceneManager : MonoBehaviour
 
         // ── STEP 7: Look at Reset Item ──
         if (resetItemTransform != null)
-        {
             yield return StartCoroutine(
                 LookAtTarget(resetItemTransform.position, lookAtResetDuration));
-        }
 
         yield return new WaitForSeconds(holdOnResetDuration);
 
@@ -136,8 +137,8 @@ public class DoorCutsceneManager : MonoBehaviour
     IEnumerator RepositionPlayer(Vector3 targetPosition,
         Quaternion targetRotation, float duration)
     {
-        Vector3 startPos = playerBody.position;
-        Quaternion startBodyRot = playerBody.rotation;
+        Vector3 startPos = GetPlayerRootTransform().position;
+        Quaternion startRot = GetPlayerRootTransform().rotation;
 
         float elapsed = 0f;
         while (elapsed < duration)
@@ -145,53 +146,55 @@ public class DoorCutsceneManager : MonoBehaviour
             float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
 
             if (characterController != null)
-            {
                 characterController.enabled = false;
-                playerBody.position = Vector3.Lerp(startPos, targetPosition, t);
-                playerBody.rotation = Quaternion.Lerp(startBodyRot, targetRotation, t);
+
+            GetPlayerRootTransform().position =
+                Vector3.Lerp(startPos, targetPosition, t);
+            GetPlayerRootTransform().rotation =
+                Quaternion.Lerp(startRot, targetRotation, t);
+
+            if (characterController != null)
                 characterController.enabled = true;
-            }
-            else
-            {
-                playerBody.position = Vector3.Lerp(startPos, targetPosition, t);
-                playerBody.rotation = Quaternion.Lerp(startBodyRot, targetRotation, t);
-            }
 
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        // Snap to exact final values
+        // Snap to exact values
         if (characterController != null)
-        {
             characterController.enabled = false;
-            playerBody.position = targetPosition;
-            playerBody.rotation = targetRotation;
+        GetPlayerRootTransform().position = targetPosition;
+        GetPlayerRootTransform().rotation = targetRotation;
+        if (characterController != null)
             characterController.enabled = true;
-        }
-        else
-        {
-            playerBody.position = targetPosition;
-            playerBody.rotation = targetRotation;
-        }
 
-        // Sync MouseMovement to new body rotation
+        // Sync MouseMovement
+        SyncMouseMovementToCurrentTransforms();
+
+        // ── FIX 1: Reset camera to straight forward, no tilt ──
+        playerCamera.localRotation = Quaternion.identity;
         if (mouseMovement != null)
-        {
-            float currentX = playerCamera.localEulerAngles.x;
-            if (currentX > 180f) currentX -= 360f;
-            mouseMovement.SetXRotation(currentX);
+            mouseMovement.SetXRotation(0f);
+    }
 
-            Vector3 euler = targetRotation.eulerAngles;
-            mouseMovement.SetBodyYRotation(euler.y);
-        }
+    Transform GetPlayerRootTransform()
+    {
+        if (playerRoot != null) return playerRoot;
+        if (playerBody != null && playerBody.parent != null)
+            return playerBody.parent;
+        return playerBody;
+    }
 
-        // Smoothly look at door face after repositioning
-        Vector3 lookTarget = doorTarget != null
-            ? doorTarget.position
-            : door.transform.position;
+    void SyncMouseMovementToCurrentTransforms()
+    {
+        if (mouseMovement == null) return;
 
-        yield return StartCoroutine(LookAtTargetSmooth(lookTarget, 0.3f));
+        float currentX = playerCamera.localEulerAngles.x;
+        if (currentX > 180f) currentX -= 360f;
+        mouseMovement.SetXRotation(currentX);
+
+        float currentY = GetPlayerRootTransform().eulerAngles.y;
+        mouseMovement.SetBodyYRotation(currentY);
     }
 
     IEnumerator RotateCamera(Vector3 targetLocalEuler, float duration)
@@ -213,7 +216,8 @@ public class DoorCutsceneManager : MonoBehaviour
     IEnumerator LookAtTarget(Vector3 targetWorldPosition, float duration)
     {
         Quaternion startRot = playerCamera.rotation;
-        Vector3 direction = (targetWorldPosition - playerCamera.position).normalized;
+        Vector3 direction =
+            (targetWorldPosition - playerCamera.position).normalized;
         Quaternion endRot = Quaternion.LookRotation(direction);
 
         float elapsed = 0f;
@@ -225,32 +229,8 @@ public class DoorCutsceneManager : MonoBehaviour
             yield return null;
         }
         playerCamera.rotation = endRot;
-    }
 
-    IEnumerator LookAtTargetSmooth(Vector3 targetWorldPosition, float duration)
-    {
-        Quaternion startRot = playerCamera.localRotation;
-        Vector3 direction = (targetWorldPosition - playerCamera.position).normalized;
-        Quaternion worldEnd = Quaternion.LookRotation(direction);
-
-        // Convert world rotation to local
-        Quaternion parentRot = playerCamera.parent != null
-            ? playerCamera.parent.rotation
-            : Quaternion.identity;
-        Quaternion localEnd = Quaternion.Inverse(parentRot) * worldEnd;
-
-        float elapsed = 0f;
-        while (elapsed < duration)
-        {
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
-            playerCamera.localRotation = Quaternion.Lerp(startRot, localEnd, t);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-
-        playerCamera.localRotation = localEnd;
-
-        // Sync X rotation to MouseMovement
+        // Sync X after world space look
         float finalX = playerCamera.localEulerAngles.x;
         if (finalX > 180f) finalX -= 360f;
         if (mouseMovement != null)
@@ -259,7 +239,6 @@ public class DoorCutsceneManager : MonoBehaviour
 
     IEnumerator StepForward(float distance, float duration)
     {
-        // Disable door colliders so player doesn't get blocked
         Collider[] doorColliders = GetComponentsInChildren<Collider>();
         foreach (Collider dc in doorColliders)
             dc.enabled = false;
@@ -272,51 +251,59 @@ public class DoorCutsceneManager : MonoBehaviour
             float step = speed * Time.deltaTime;
 
             if (characterController != null)
-                characterController.Move(playerBody.forward * step);
+                characterController.Move(
+                    GetPlayerRootTransform().forward * step);
             else
-                playerBody.position += playerBody.forward * step;
+                GetPlayerRootTransform().position +=
+                    GetPlayerRootTransform().forward * step;
 
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        // Re-enable door colliders
         foreach (Collider dc in doorColliders)
             dc.enabled = true;
     }
 
     void DisablePlayer()
     {
-        if (playerMovement != null)
-            playerMovement.enabled = false;
-        if (mouseMovement != null)
-            mouseMovement.enabled = false;
+        if (playerMovement != null) playerMovement.enabled = false;
+        if (mouseMovement != null) mouseMovement.enabled = false;
+        if (playerInteraction != null) playerInteraction.enabled = false;
+
         if (playerInteraction != null)
-            playerInteraction.enabled = false;
+    {
+        playerInteraction.HideUI();
+    }
+
     }
 
     void EnablePlayer()
     {
-        // Get final camera X and convert to -180/180 range
-        float finalX = playerCamera.localEulerAngles.x;
-        if (finalX > 180f) finalX -= 360f;
-        finalX = Mathf.Clamp(finalX, -89f, 89f);
+        Vector3 worldEuler = playerCamera.rotation.eulerAngles;
 
-        // Zero out Y and Z to prevent sideways drift
-        playerCamera.localRotation = Quaternion.Euler(finalX, 0f, 0f);
+        float targetY = worldEuler.y;
+        mouseMovement.SetBodyYRotation(targetY);
+        GetPlayerRootTransform().eulerAngles = new Vector3(0f, targetY, 0f);
 
-        if (mouseMovement != null)
-        {
-            mouseMovement.enabled = true;
-            mouseMovement.SetXRotation(finalX);
-        }
+        float targetX = worldEuler.x;
+        if (targetX > 180f) targetX -= 360f;
+        targetX = Mathf.Clamp(targetX, -89f, 89f);
 
-        if (playerMovement != null)
-            playerMovement.enabled = true;
+        playerCamera.localRotation = Quaternion.Euler(targetX, 0f, 0f);
+        mouseMovement.SetXRotation(targetX);
 
-        if (playerInteraction != null)
-            playerInteraction.enabled = true;
+        if (mouseMovement != null) mouseMovement.enabled = true;
+        if (playerMovement != null) playerMovement.enabled = true;
+        if (playerInteraction != null) playerInteraction.enabled = true;
 
-        Debug.Log("[DoorCutscene] Complete. Player enabled.");
+        if (controlsUI != null)
+            controlsUI.ShowItemControls();
+
+            if (playerInteraction != null)
+        playerInteraction.RestoreUI();
+
+        Debug.Log("[DoorCutscene] Complete. Player Y=" + targetY +
+            " Camera X=" + targetX);
     }
 }

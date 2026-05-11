@@ -24,6 +24,8 @@ public class BreakerSwitch : MonoBehaviour
 
     public void Interact()
     {
+        Debug.Log("[BreakerSwitch] Interact called on: " + breakerLabel + " (index " + breakerIndex + ") | isFlipped: " + isFlipped + " | isInteractable: " + isInteractable);
+
         if (!isInteractable)
         {
             if (AdminDialogue.Instance != null)
@@ -43,6 +45,7 @@ public class BreakerSwitch : MonoBehaviour
         isFlipped = true;
         UpdateVisual();
 
+        Debug.Log("[BreakerSwitch] Notifying panel: index " + breakerIndex);
         if (panel != null)
             panel.OnBreakerFlipped(breakerIndex);
     }

@@ -31,6 +31,7 @@ public class PlayerInteraction : MonoBehaviour
     private LightSwitchToggle currentLightSwitch;
     private FuseBoxPuzzle currentFuseBox;
     private CableConnectionPuzzle currentCable;
+    private CableSocket currentCableSocket;
     private BookSlot currentBookSlot;
     private ChapterTransition currentChapterTransition;
     private Chapter4PuzzleChoice currentChapter4Choice;
@@ -39,6 +40,10 @@ public class PlayerInteraction : MonoBehaviour
     private ArchivesDoor currentArchivesDoor;
     private MaintenanceRoomDoor currentMaintenanceDoor;
     private BreakerSwitch currentBreaker;
+    private ServerTerminal currentServer;
+    private LockedObject currentLockedObject;
+    private KeycardDoor currentKeycardDoor;
+    private MaintenanceOverridePanel currentOverridePanel;
 
     void Start()
     {
@@ -79,12 +84,20 @@ public class PlayerInteraction : MonoBehaviour
                 currentLightSwitch.Toggle();
             else if (currentFuseBox != null)
                 currentFuseBox.Interact();
-            else if (currentCable != null)
-                currentCable.Interact();
+            else if (currentCableSocket != null)
+                currentCableSocket.Interact();
             else if (currentBookSlot != null)
                 currentBookSlot.Interact();
             else if (currentBreaker != null)
                 currentBreaker.Interact();
+            else if (currentServer != null)
+                currentServer.Interact();
+            else if (currentLockedObject != null)
+                currentLockedObject.Interact();
+            else if (currentKeycardDoor != null)
+                currentKeycardDoor.Interact();
+            else if (currentOverridePanel != null)
+                currentOverridePanel.Interact();
             else if (currentChapterTransition != null)
                 currentChapterTransition.Interact();
             else if (currentChapter4Choice != null)
@@ -136,18 +149,29 @@ public class PlayerInteraction : MonoBehaviour
                 .GetComponent<LightSwitchToggle>();
             if (lightSwitch != null) { SetOnly(lightSwitch: lightSwitch); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
 
-            FuseBoxPuzzle fuseBox = hit.collider.GetComponent<FuseBoxPuzzle>();
+            FuseBoxPuzzle fuseBox = hit.collider.GetComponentInParent<FuseBoxPuzzle>();
             if (fuseBox != null) { SetOnly(fuseBox: fuseBox); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
 
-            CableConnectionPuzzle cable = hit.collider
-                .GetComponent<CableConnectionPuzzle>();
-            if (cable != null) { SetOnly(cable: cable); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            CableSocket cableSocket = hit.collider.GetComponentInParent<CableSocket>();
+            if (cableSocket != null) { SetOnly(cable: null, cableSocket: cableSocket); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
 
             BookSlot bookSlot = hit.collider.GetComponent<BookSlot>();
             if (bookSlot != null) { SetOnly(bookSlot: bookSlot); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
 
-            BreakerSwitch breaker = hit.collider.GetComponent<BreakerSwitch>();
+            BreakerSwitch breaker = hit.collider.GetComponentInParent<BreakerSwitch>();
             if (breaker != null) { SetOnly(breaker: breaker); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+
+            ServerTerminal server = hit.collider.GetComponentInParent<ServerTerminal>();
+            if (server != null) { SetOnly(server: server); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+
+            LockedObject lockedObj = hit.collider.GetComponentInParent<LockedObject>();
+            if (lockedObj != null) { SetOnly(lockedObject: lockedObj); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+
+            KeycardDoor keycardDoor = hit.collider.GetComponentInParent<KeycardDoor>();
+            if (keycardDoor != null) { SetOnly(keycardDoor: keycardDoor); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+
+            MaintenanceOverridePanel overridePanel = hit.collider.GetComponentInParent<MaintenanceOverridePanel>();
+            if (overridePanel != null) { SetOnly(overridePanel: overridePanel); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
 
             ChapterTransition chapterTransition = hit.collider
                 .GetComponent<ChapterTransition>();
@@ -179,6 +203,7 @@ public class PlayerInteraction : MonoBehaviour
         LightSwitchToggle lightSwitch = null,
         FuseBoxPuzzle fuseBox = null,
         CableConnectionPuzzle cable = null,
+        CableSocket cableSocket = null,
         BookSlot bookSlot = null,
         ChapterTransition chapterTransition = null,
         Chapter4PuzzleChoice ch4Choice = null,
@@ -187,7 +212,11 @@ public class PlayerInteraction : MonoBehaviour
         ArchivesDoor archivesDoor = null,
         MaintenanceRoomDoor maintenanceDoor = null,
         PatternAnchor pattern = null,
-        BreakerSwitch breaker = null)
+        BreakerSwitch breaker = null,
+        ServerTerminal server = null,
+        LockedObject lockedObject = null,
+        KeycardDoor keycardDoor = null,
+        MaintenanceOverridePanel overridePanel = null)
     {
         currentDoor = door;
         currentTrapDoor = trapDoor;
@@ -197,6 +226,7 @@ public class PlayerInteraction : MonoBehaviour
         currentLightSwitch = lightSwitch;
         currentFuseBox = fuseBox;
         currentCable = cable;
+        currentCableSocket = cableSocket;
         currentBookSlot = bookSlot;
         currentChapterTransition = chapterTransition;
         currentChapter4Choice = ch4Choice;
@@ -206,9 +236,22 @@ public class PlayerInteraction : MonoBehaviour
         currentMaintenanceDoor = maintenanceDoor;
         currentPatternAnchor = pattern;
         currentBreaker = breaker;
+        currentServer = server;
+        currentLockedObject = lockedObject;
+        currentKeycardDoor = keycardDoor;
+        currentOverridePanel = overridePanel;
     }
 
     void ClearAll() { SetOnly(); }
+
+    public void RestoreUI()
+{
+    if (crosshairText != null)
+        crosshairText.text = normalCrosshair;
+
+    if (interactionTooltip != null)
+        interactionTooltip.gameObject.SetActive(false);
+}
 
     void SetCrosshairNormal()
     {
@@ -217,6 +260,14 @@ public class PlayerInteraction : MonoBehaviour
         crosshairText.color = normalColor;
         crosshairText.fontSize = normalSize;
     }
+    public void HideUI()
+{
+    if (interactionTooltip != null)
+        interactionTooltip.gameObject.SetActive(false);
+
+    if (crosshairText != null)
+        crosshairText.text = "";
+}
 
     void SetCrosshairInteract()
     {

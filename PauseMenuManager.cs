@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
 using TMPro;
-using UnityEngine.UI;
 
 public class PauseMenuManager : MonoBehaviour
 {
@@ -17,7 +16,7 @@ public class PauseMenuManager : MonoBehaviour
     public string mainMenuSceneName = "TitleScreen";
 
     [Header("Colors")]
-    public Color normalColor = new Color(0.7f, 0.94f, 1f, 1f);
+    public Color normalColor    = new Color(0.7f, 0.94f, 1f, 1f);
     public Color highlightColor = new Color(0f, 0.86f, 1f, 1f);
 
     private bool isPaused = false;
@@ -47,7 +46,6 @@ public class PauseMenuManager : MonoBehaviour
 
         if (!isPaused) return;
 
-        // Navigate with arrow keys or W/S
         if (Keyboard.current.downArrowKey.wasPressedThisFrame ||
             Keyboard.current.sKey.wasPressedThisFrame)
         {
@@ -62,7 +60,6 @@ public class PauseMenuManager : MonoBehaviour
             UpdateHighlight();
         }
 
-        // Confirm with Enter or Space
         if (Keyboard.current.enterKey.wasPressedThisFrame ||
             Keyboard.current.spaceKey.wasPressedThisFrame)
         {
@@ -76,7 +73,6 @@ public class PauseMenuManager : MonoBehaviour
         {
             if (buttons[i] == null) continue;
             buttons[i].color = (i == selectedIndex) ? highlightColor : normalColor;
-            // Add > indicator to selected
             string baseText = buttons[i].text.Replace("> ", "").Replace("   ", "");
             buttons[i].text = (i == selectedIndex) ? "> " + baseText : "   " + baseText;
         }
@@ -86,10 +82,10 @@ public class PauseMenuManager : MonoBehaviour
     {
         switch (selectedIndex)
         {
-            case 0: ResumeGame(); break;
-            case 1: OpenSettings(); break;
-            case 2: ReturnToMainMenu(); break;
-            case 3: QuitGame(); break;
+            case 0: ResumeGame();        break;
+            case 1: OpenSettings();      break;
+            case 2: ReturnToMainMenu();  break;
+            case 3: QuitGame();          break;
         }
     }
 
@@ -102,6 +98,10 @@ public class PauseMenuManager : MonoBehaviour
         UpdateHighlight();
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+
+        // Show objectives panel on the right
+        if (ObjectiveManager.Instance != null)
+            ObjectiveManager.Instance.SetObjectivesPanelVisible(true);
     }
 
     public void ResumeGame()
@@ -111,6 +111,10 @@ public class PauseMenuManager : MonoBehaviour
         pauseMenuCanvas.SetActive(false);
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        // Hide objectives panel
+        if (ObjectiveManager.Instance != null)
+            ObjectiveManager.Instance.SetObjectivesPanelVisible(false);
     }
 
     public void OpenSettings()

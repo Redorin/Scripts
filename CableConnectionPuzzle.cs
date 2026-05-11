@@ -1,81 +1,113 @@
 using UnityEngine;
 
-// Attach to each Cable object in the scene.
-// Player presses E to connect cable to nearest open socket.
+// Attach to SocketA and SocketB.
+// Player picks up the socket (HoldableItem) and presses E near a WallPlug to connect.
+// Burnt sockets must be reset with Reset Device first.
 
+[RequireComponent(typeof(HoldableItem))]
 public class CableConnectionPuzzle : MonoBehaviour
 {
     [Header("Cable Info")]
-    public string cableName = "Cable";
+    public string cableName = "Socket A";
+    public string cableID   = "CableA";     // Must match WallPlug's requiredCableID
+
+    [Header("Burnt Settings")]
+    public bool isBurnt = false;
+    public string burntMessage = "Socket is damaged. Use the Reset Device to restore it.";
+
+    [Header("State")]
     public bool isConnected = false;
 
     [Header("Visual")]
-    public Renderer cableRenderer;
-    public Color disconnectedColor = Color.red;
+    public Renderer socketRenderer;
+    public Color normalColor    = Color.white;
+    public Color burntColor     = new Color(0.2f, 0.1f, 0f);
     public Color connectedColor = Color.green;
+
+    private HoldableItem holdable;
 
     void Start()
     {
-        if (cableRenderer == null)
-            cableRenderer = GetComponent<Renderer>();
+        holdable = GetComponent<HoldableItem>();
 
-        if (cableRenderer != null)
-            cableRenderer.material.color = disconnectedColor;
+        if (socketRenderer == null)
+            socketRenderer = GetComponent<Renderer>();
+
+        UpdateVisual();
+
+        // Burnt sockets can't be picked up until restored
+        if (isBurnt && holdable != null)
+            holdable.enabled = false;
     }
 
-    public void Interact()
+    // Called by BurntCableResettable when Reset Device restores it
+    public void Restore()
+    {
+        isBurnt = false;
+
+        if (holdable != null)
+            holdable.enabled = true;
+
+        UpdateVisual();
+
+        if (AdminDialogue.Instance != null)
+            AdminDialogue.Instance.AdminInfo(
+                cableName + " restored. Pick it up and plug it in.");
+    }
+
+    // Called by PlayerInteraction when player presses E near a WallPlug while holding this
+    public void ConnectToPlug(CableSocket wallPlug)
     {
         if (isConnected)
         {
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminInfo("Cable already connected.");
+                AdminDialogue.Instance.AdminInfo(cableName + " already connected.");
             return;
         }
 
-        // Find nearest available socket
-        CableSocket[] sockets = FindObjectsOfType<CableSocket>();
-        CableSocket nearest = null;
-        float nearestDist = float.MaxValue;
-
-        foreach (CableSocket socket in sockets)
-        {
-            if (socket.isFilled) continue;
-            float dist = Vector3.Distance(transform.position, socket.transform.position);
-            if (dist < nearestDist)
-            {
-                nearestDist = dist;
-                nearest = socket;
-            }
-        }
-
-        if (nearest != null)
-        {
-            ConnectToSocket(nearest);
-        }
-        else
+        if (isBurnt)
         {
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminWarning("No available socket detected.");
+                AdminDialogue.Instance.AdminWarning(burntMessage);
+            return;
         }
-    }
 
-    void ConnectToSocket(CableSocket socket)
-    {
         isConnected = true;
-        socket.Fill(this);
+        wallPlug.Fill(this);
 
-        // Snap cable visually to socket position
-        transform.position = socket.transform.position;
-        transform.SetParent(socket.transform);
+        // Snap socket to wall plug and detach from player
+        transform.SetParent(wallPlug.transform);
+        transform.localPosition = Vector3.zero;
+        transform.localRotation = Quaternion.identity;
 
-        if (cableRenderer != null)
-            cableRenderer.material.color = connectedColor;
+        // Disable holdable — now fixed in wall
+        if (holdable != null)
+        {
+            holdable.Drop();
+            holdable.enabled = false;
+        }
 
-        Debug.Log(cableName + " connected to " + socket.name);
+        // Disable collider so player doesn't re-interact
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
+        UpdateVisual();
+
+        if (AdminDialogue.Instance != null)
+            AdminDialogue.Instance.AdminInfo(cableName + " plugged in.");
 
         // Notify manager
-        CableConnectionPuzzleManager manager = FindObjectOfType<CableConnectionPuzzleManager>();
+        CableConnectionPuzzleManager manager =
+            FindFirstObjectByType<CableConnectionPuzzleManager>();
         if (manager != null)
-            manager.CheckAllConnected();
+            manager.OnCableConnected();
+    }
+
+    void UpdateVisual()
+    {
+        if (socketRenderer == null) return;
+        if (isConnected)  socketRenderer.material.color = connectedColor;
+        else if (isBurnt) socketRenderer.material.color = burntColor;
+        else              socketRenderer.material.color = normalColor;
     }
 }

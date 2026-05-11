@@ -78,7 +78,7 @@ public class ResetItem : MonoBehaviour
         if (Physics.Raycast(ray, out hit, resetRange))
         {
             // Priority 1 - Debris piece (resets whole group at once)
-            DebrisPiece debrisPiece = hit.collider.GetComponent<DebrisPiece>();
+            DebrisPiece debrisPiece = hit.collider.GetComponentInParent<DebrisPiece>();
             if (debrisPiece != null)
             {
                 debrisPiece.NotifyGroup();
@@ -87,7 +87,7 @@ public class ResetItem : MonoBehaviour
             }
 
             // Priority 2 - Chapter 3 student (block reset)
-            StudentObject student = hit.collider.GetComponent<StudentObject>();
+            StudentObject student = hit.collider.GetComponentInParent<StudentObject>();
             if (student != null)
             {
                 student.AttemptReset();
@@ -95,7 +95,7 @@ public class ResetItem : MonoBehaviour
             }
 
             // Priority 3 - Chapter 5 final choice
-            FinalChoiceHandler finalChoice = hit.collider.GetComponent<FinalChoiceHandler>();
+            FinalChoiceHandler finalChoice = hit.collider.GetComponentInParent<FinalChoiceHandler>();
             if (finalChoice != null)
             {
                 finalChoice.OnReset();
@@ -105,7 +105,8 @@ public class ResetItem : MonoBehaviour
             }
 
             // Priority 4 - Normal resettable object
-            ResettableObject resettable = hit.collider.GetComponent<ResettableObject>();
+            // GetComponentInParent allows collider to live on child meshes
+            ResettableObject resettable = hit.collider.GetComponentInParent<ResettableObject>();
             if (resettable != null)
             {
                 bool success = resettable.Reset();

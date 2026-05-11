@@ -11,6 +11,10 @@ public class CutsceneManager : MonoBehaviour
     public PlayerMovement playerMovement;
     public MouseMovement mouseMovement;
     public GameObject cutsceneCamera;
+    
+    [Header("Controls UI")]
+public ControlsUI controlsUI;
+
 
     [Header("Timing")]
     public float fadeInDuration = 2f;
@@ -100,6 +104,10 @@ public class CutsceneManager : MonoBehaviour
         // Admin dialogue
         if (AdminDialogue.Instance != null)
             AdminDialogue.Instance.AdminInfo("Session Initialized.");
+
+            // Show basic controls after opening cutscene
+    if (controlsUI != null)
+        controlsUI.ShowBasicControls();
 
         Debug.Log("[CUTSCENE] Complete. Player enabled.");
     }

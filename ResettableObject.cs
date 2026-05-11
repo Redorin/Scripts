@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public class ResettableObject : MonoBehaviour
 {
@@ -26,27 +27,28 @@ public class ResettableObject : MonoBehaviour
 
     [Header("Manual Original State (Optional)")]
     public bool useManualOriginalPosition = false;
-    public Vector3 manualOriginalPosition;      // LOCAL position
+    public Vector3 manualOriginalPosition;
     public Vector3 manualOriginalRotation;
+
+    [Header("Smooth Restore")]
+    public bool smoothRestore = false;
+    public float smoothRestoreDuration = 1.0f;
 
     [Header("Visual Feedback")]
     public bool showResetIndicator = true;
     public Color indicatorColor = Color.cyan;
 
-    // Stored in LOCAL space to avoid parent offset issues
     [SerializeField] private Vector3 originalLocalPosition;
     [SerializeField] private Quaternion originalLocalRotation;
     [SerializeField] private Vector3 originalLocalScale;
     [SerializeField] private bool originalActiveState;
     [SerializeField] private bool hasStoredOriginalState = false;
 
-    // Alternate state for toggles
     private Vector3 alternateLocalPosition;
     private Quaternion alternateLocalRotation;
     private Vector3 alternateLocalScale;
     private bool alternateActiveState;
 
-    // Physics
     private Rigidbody rb;
     private bool originalKinematic;
     private bool originalGravity;
@@ -66,7 +68,7 @@ public class ResettableObject : MonoBehaviour
 
     void Awake()
     {
-        if (!hasStoredOriginalState)
+        if (!hasStoredOriginalState || useManualOriginalPosition)
             StoreOriginalState();
 
         rb = GetComponent<Rigidbody>();
@@ -79,7 +81,8 @@ public class ResettableObject : MonoBehaviour
 
     void Start()
     {
-        Debug.Log("ResettableObject: " + objectName + " | Local pos: " + originalLocalPosition);
+        Debug.Log("ResettableObject: " + objectName +
+            " | Local pos: " + originalLocalPosition);
     }
 
     void StoreOriginalState()
@@ -91,7 +94,6 @@ public class ResettableObject : MonoBehaviour
         }
         else
         {
-            // Store LOCAL position - not affected by parent offset
             originalLocalPosition = transform.localPosition;
             originalLocalRotation = transform.localRotation;
         }
@@ -99,8 +101,6 @@ public class ResettableObject : MonoBehaviour
         originalLocalScale = transform.localScale;
         originalActiveState = gameObject.activeSelf;
         hasStoredOriginalState = true;
-
-        Debug.Log("Stored LOCAL state for: " + objectName + " at local pos: " + originalLocalPosition);
     }
 
     public bool Reset()
@@ -108,20 +108,27 @@ public class ResettableObject : MonoBehaviour
         if (!canBeReset)
         {
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminWarning("Object cannot be restored.");
+                AdminDialogue.Instance.AdminWarning(
+                    "Object cannot be restored.");
             return false;
         }
 
         if (!unlimitedUses && currentUses >= maxResetUses)
         {
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminWarning("Correction limit exceeded for this object.");
+                AdminDialogue.Instance.AdminWarning(
+                    "Correction limit exceeded for this object.");
             return false;
         }
 
         switch (resetType)
         {
-            case ResetType.RestoreToOriginal: RestoreToOriginal(); break;
+            case ResetType.RestoreToOriginal:
+                if (smoothRestore)
+                    StartCoroutine(SmoothRestoreToOriginal());
+                else
+                    RestoreToOriginal();
+                break;
             case ResetType.Toggle: ToggleState(); break;
             case ResetType.Destroy: DestroyObject(); break;
         }
@@ -133,35 +140,122 @@ public class ResettableObject : MonoBehaviour
             if (currentUses == 1)
                 AdminDialogue.Instance.AdminInfo("Integrity restored.");
             else if (currentUses >= maxResetUses && !unlimitedUses)
-                AdminDialogue.Instance.AdminWarning("Maximum corrections applied to this object.");
+                AdminDialogue.Instance.AdminWarning(
+                    "Maximum corrections applied to this object.");
         }
 
         return true;
     }
 
+    // ── Instant restore ──────────────────────────────────────────────────────
     void RestoreToOriginal()
     {
-        // Stop physics first
+        Collider[] allColliders = GetComponentsInChildren<Collider>(true);
+        foreach (Collider c in allColliders) c.enabled = false;
+
+        Rigidbody[] allRigidbodies = GetComponentsInChildren<Rigidbody>(true);
+        foreach (Rigidbody r in allRigidbodies)
+        {
+            r.linearVelocity = Vector3.zero;
+            r.angularVelocity = Vector3.zero;
+            r.isKinematic = true;
+        }
+
+        if (resetPosition) transform.localPosition = originalLocalPosition;
+        if (resetRotation) transform.localRotation = originalLocalRotation;
+        if (resetScale) transform.localScale = originalLocalScale;
+        if (resetActiveState) gameObject.SetActive(originalActiveState);
+
+        foreach (Collider c in allColliders) c.enabled = true;
+
         if (resetPhysics && rb != null)
         {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
             rb.isKinematic = originalKinematic;
             rb.useGravity = originalGravity;
         }
+        else
+        {
+            foreach (Rigidbody r in allRigidbodies)
+            {
+                r.isKinematic = false;
+                r.useGravity = true;
+            }
+        }
 
-        // Restore LOCAL position
-        if (resetPosition)
-            transform.localPosition = originalLocalPosition;
+        NotifyListeners();
+    }
 
-        if (resetRotation)
-            transform.localRotation = originalLocalRotation;
+    // ── Smooth restore (slides into place) ──────────────────────────────────
+    IEnumerator SmoothRestoreToOriginal()
+    {
+        // Freeze physics immediately
+        Rigidbody[] allRigidbodies = GetComponentsInChildren<Rigidbody>(true);
+        foreach (Rigidbody r in allRigidbodies)
+        {
+            r.linearVelocity = Vector3.zero;
+            r.angularVelocity = Vector3.zero;
+            r.isKinematic = true;
+        }
 
-        if (resetScale)
-            transform.localScale = originalLocalScale;
+        // Disable colliders during move
+        Collider[] allColliders = GetComponentsInChildren<Collider>(true);
+        foreach (Collider c in allColliders) c.enabled = false;
 
-        if (resetActiveState)
-            gameObject.SetActive(originalActiveState);
+        Vector3 startLocalPos = transform.localPosition;
+        Quaternion startLocalRot = transform.localRotation;
+
+        float elapsed = 0f;
+        while (elapsed < smoothRestoreDuration)
+        {
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / smoothRestoreDuration);
+
+            if (resetPosition)
+                transform.localPosition = Vector3.Lerp(
+                    startLocalPos, originalLocalPosition, t);
+
+            if (resetRotation)
+                transform.localRotation = Quaternion.Lerp(
+                    startLocalRot, originalLocalRotation, t);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Snap to exact final values
+        if (resetPosition) transform.localPosition = originalLocalPosition;
+        if (resetRotation) transform.localRotation = originalLocalRotation;
+        if (resetScale) transform.localScale = originalLocalScale;
+        if (resetActiveState) gameObject.SetActive(originalActiveState);
+
+        // Re-enable colliders
+        foreach (Collider c in allColliders) c.enabled = true;
+
+        // Restore physics
+        if (resetPhysics && rb != null)
+        {
+            rb.isKinematic = originalKinematic;
+            rb.useGravity = originalGravity;
+        }
+        else
+        {
+            foreach (Rigidbody r in allRigidbodies)
+            {
+                r.isKinematic = false;
+                r.useGravity = true;
+            }
+        }
+
+        NotifyListeners();
+    }
+
+    void NotifyListeners()
+    {
+        ConduitResettable conduit = GetComponentInParent<ConduitResettable>();
+        if (conduit != null) conduit.OnConduitReset();
+
+        BurntCableResettable burntCable =
+            GetComponentInParent<BurntCableResettable>();
+        if (burntCable != null) burntCable.OnCableRestored();
     }
 
     void ToggleState()
@@ -184,11 +278,13 @@ public class ResettableObject : MonoBehaviour
     void DestroyObject()
     {
         if (AdminDialogue.Instance != null)
-            AdminDialogue.Instance.AdminWarning("Object removed from environment.");
+            AdminDialogue.Instance.AdminWarning(
+                "Object removed from environment.");
         Destroy(gameObject);
     }
 
-    public void SetAlternateState(Vector3 localPos, Quaternion localRot, Vector3 scale, bool active)
+    public void SetAlternateState(Vector3 localPos, Quaternion localRot,
+        Vector3 scale, bool active)
     {
         alternateLocalPosition = localPos;
         alternateLocalRotation = localRot;
@@ -196,10 +292,8 @@ public class ResettableObject : MonoBehaviour
         alternateActiveState = active;
     }
 
-    // Public accessors for DebrisGroup animation
     public Vector3 GetOriginalPosition()
     {
-        // Returns WORLD position for animation purposes
         if (transform.parent != null)
             return transform.parent.TransformPoint(originalLocalPosition);
         return originalLocalPosition;
@@ -212,21 +306,30 @@ public class ResettableObject : MonoBehaviour
         return originalLocalRotation;
     }
 
-    // Called by DebrisGroup - bypasses all checks
     public void ForceRestore()
     {
-        if (rb != null)
+        Collider[] allColliders = GetComponentsInChildren<Collider>(true);
+        foreach (Collider c in allColliders) c.enabled = false;
+
+        Rigidbody[] allRigidbodies = GetComponentsInChildren<Rigidbody>(true);
+        foreach (Rigidbody r in allRigidbodies)
         {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-            rb.isKinematic = true;
+            r.linearVelocity = Vector3.zero;
+            r.angularVelocity = Vector3.zero;
+            r.isKinematic = true;
         }
 
-        // Restore local position
         transform.localPosition = originalLocalPosition;
         transform.localRotation = originalLocalRotation;
 
-        Debug.Log(objectName + " force restored to local pos: " + originalLocalPosition);
+        foreach (Collider c in allColliders) c.enabled = true;
+        foreach (Rigidbody r in allRigidbodies)
+        {
+            r.isKinematic = false;
+            r.useGravity = true;
+        }
+
+        Debug.Log(objectName + " force restored.");
     }
 
     public bool CanBeReset()
@@ -236,11 +339,8 @@ public class ResettableObject : MonoBehaviour
         return true;
     }
 
-    public int GetRemainingUses()
-    {
-        if (unlimitedUses) return 999;
-        return maxResetUses - currentUses;
-    }
+    public int GetRemainingUses() =>
+        unlimitedUses ? 999 : maxResetUses - currentUses;
 
     void OnDrawGizmos()
     {
@@ -250,41 +350,4 @@ public class ResettableObject : MonoBehaviour
             Gizmos.DrawWireSphere(transform.position, 0.5f);
         }
     }
-
-    void RestoreToOriginal()
-{
-    // Position
-    if (resetPosition)
-    {
-        transform.position = originalPosition;
-        Debug.Log("Restored " + objectName + " to position: " + originalPosition);
-    }
-
-    // Rotation
-    if (resetRotation)
-        transform.rotation = originalRotation;
-
-    // Scale
-    if (resetScale)
-        transform.localScale = originalScale;
-
-    // Physics
-    if (resetPhysics && rb != null)
-    {
-        rb.linearVelocity = Vector3.zero;
-        rb.angularVelocity = Vector3.zero;
-        rb.isKinematic = originalKinematic;
-        rb.useGravity = originalGravity;
-    }
-
-    // Active state
-    if (resetActiveState)
-        gameObject.SetActive(originalActiveState);
-
-    // ── NEW: Notify conduit if this is a conduit ──
-    ConduitResettable conduit = GetComponent<ConduitResettable>();
-    if (conduit != null)
-        conduit.OnConduitReset();
 }
-}
-

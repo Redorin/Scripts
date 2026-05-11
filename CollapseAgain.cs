@@ -3,13 +3,17 @@ using System.Collections;
 
 // Attach to an invisible trigger zone PAST the first collapsed ceiling area.
 // When player walks through, a second set of debris falls and cannot be reset.
-// This teaches the player that reset limits exist.
+// Shelves in the hallway also fall simultaneously to block the path.
 
 public class CollapseAgain : MonoBehaviour
 {
     [Header("Debris")]
-    public GameObject[] debrisObjects;      // Second set of ceiling debris cubes
-    public float fallDelay = 0.5f;          // Delay before debris falls
+    public GameObject[] debrisObjects;
+    public float fallDelay = 0.5f;
+
+    [Header("Shelves")]
+    public GameObject[] shelfObjects;       // Shelf GameObjects to fall with debris
+    public float shelfFallDelay = 0f;       // Extra delay after debris (0 = same time)
 
     [Header("Camera Shake")]
     public float shakeDuration = 0.4f;
@@ -37,8 +41,19 @@ public class CollapseAgain : MonoBehaviour
             Rigidbody rb = debris.GetComponent<Rigidbody>();
             if (rb != null) rb.isKinematic = true;
 
-            // Make sure ResettableObject has canBeReset = false
             ResettableObject resettable = debris.GetComponent<ResettableObject>();
+            if (resettable != null) resettable.canBeReset = false;
+        }
+
+        // Keep shelves frozen at start
+        foreach (GameObject shelf in shelfObjects)
+        {
+            if (shelf == null) continue;
+            Rigidbody rb = shelf.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = true;
+
+            // Shelves can't be reset either — path is permanently blocked
+            ResettableObject resettable = shelf.GetComponent<ResettableObject>();
             if (resettable != null) resettable.canBeReset = false;
         }
     }
@@ -56,13 +71,16 @@ public class CollapseAgain : MonoBehaviour
     {
         yield return new WaitForSeconds(fallDelay);
 
-        // Drop all debris
+        // Drop ceiling debris
         foreach (GameObject debris in debrisObjects)
         {
             if (debris == null) continue;
             Rigidbody rb = debris.GetComponent<Rigidbody>();
             if (rb != null) rb.isKinematic = false;
         }
+
+        // Drop shelves (with optional extra delay)
+        StartCoroutine(DropShelves());
 
         // Camera shake
         if (playerCamera != null)
@@ -76,9 +94,19 @@ public class CollapseAgain : MonoBehaviour
             foreach (string line in collapseDialogue)
                 AdminDialogue.Instance.AdminWarning(line);
         }
+    }
 
-        // Player tries to reset - nothing happens, Admin already said why
-        // The debris ResettableObject.canBeReset = false handles the block
+    IEnumerator DropShelves()
+    {
+        if (shelfFallDelay > 0f)
+            yield return new WaitForSeconds(shelfFallDelay);
+
+        foreach (GameObject shelf in shelfObjects)
+        {
+            if (shelf == null) continue;
+            Rigidbody rb = shelf.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = false;
+        }
     }
 
     IEnumerator ShakeCamera()

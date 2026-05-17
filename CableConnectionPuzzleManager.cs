@@ -1,16 +1,17 @@
+// File: CableConnectionPuzzleManager.cs
 using UnityEngine;
 
 public class CableConnectionPuzzleManager : MonoBehaviour
 {
     [Header("Cables")]
-    public CableConnectionPuzzle[] cables;  // All cables in the puzzle
+    public CableConnectionPuzzle[] cables;
 
     [Header("Server Boot Order")]
-    public ServerTerminal[] servers;        // Drag in order: servers[0] = first to boot
+    public ServerTerminal[] servers;
     public bool isSolved = false;
 
     [Header("Lockdown")]
-    public ServerRoomLockdown lockdown;     // assign in Inspector
+    public ServerRoomLockdown lockdown;
 
     [Header("On Complete")]
     public GameObject doorToUnlock;
@@ -27,7 +28,6 @@ public class CableConnectionPuzzleManager : MonoBehaviour
 
     private bool cablesComplete = false;
     private int currentBootStep = 0;
-
     private int connectionsComplete = 0;
 
     // Called by each CableConnectionPuzzle when it connects to a WallPlug
@@ -37,14 +37,15 @@ public class CableConnectionPuzzleManager : MonoBehaviour
 
         connectionsComplete++;
 
-        // Check if all cables needed are connected
         int required = cables != null ? cables.Length : 2;
         if (connectionsComplete < required) return;
 
         cablesComplete = true;
-        Chapter1Objectives.Instance?.Complete_ConnectCables();
 
-        // Enable server terminals
+        // Fire first ObjectiveTrigger — completes connect_cables, adds boot_servers
+        ObjectiveTrigger[] triggers = GetComponents<ObjectiveTrigger>();
+        if (triggers.Length > 0) triggers[0].TriggerObjective();
+
         foreach (ServerTerminal server in servers)
             if (server != null) server.SetInteractable(true);
 
@@ -58,22 +59,19 @@ public class CableConnectionPuzzleManager : MonoBehaviour
         if (isSolved) return;
         if (!cablesComplete) return;
 
-        // Check if this is the correct next server
         if (servers[currentBootStep] == server)
         {
-            server.SetOnline(); // light goes green immediately on correct boot
+            server.SetOnline();
             currentBootStep++;
 
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminInfo(
-                    "Server " + currentBootStep + " online.");
+                AdminDialogue.Instance.AdminInfo("Server " + currentBootStep + " online.");
 
             if (currentBootStep >= servers.Length)
                 SolvePuzzle();
         }
         else
         {
-            // Wrong order — reset boot sequence and increase instability
             currentBootStep = 0;
             foreach (ServerTerminal s in servers)
                 if (s != null) s.ResetBoot();
@@ -82,17 +80,18 @@ public class CableConnectionPuzzleManager : MonoBehaviour
                 InstabilityManager.Instance.IncreaseInstability(10f);
 
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminWarning(
-                    "Boot sequence error. Instability increased.");
+                AdminDialogue.Instance.AdminWarning("Boot sequence error. Instability increased.");
         }
     }
 
     void SolvePuzzle()
     {
         isSolved = true;
-        Chapter1Objectives.Instance?.Complete_BootServers(); 
 
-        // Lift server room lockdown and spawn archive key
+        // Fire second ObjectiveTrigger — completes boot_servers, adds retrieve_archive_key
+        ObjectiveTrigger[] triggers = GetComponents<ObjectiveTrigger>();
+        if (triggers.Length > 1) triggers[1].TriggerObjective();
+
         if (lockdown != null)
             lockdown.Unlock();
 
@@ -105,10 +104,7 @@ public class CableConnectionPuzzleManager : MonoBehaviour
         if (AdminDialogue.Instance != null)
             foreach (string line in solveDialogue)
                 AdminDialogue.Instance.AdminInfo(line);
-
-        Debug.Log("Server room puzzle solved.");
     }
 
-    // Legacy support — kept so nothing breaks if called externally
     public void CheckAllConnected() => OnCableConnected();
 }

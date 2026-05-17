@@ -12,7 +12,6 @@ public class ItemHolder : MonoBehaviour
 
     [Header("Settings")]
     public float pickupDistance = 3f;
-    public float throwForce = 10f;
     public int maxItems = 5;
 
     private List<MonoBehaviour> inventory = new List<MonoBehaviour>();
@@ -24,12 +23,9 @@ public class ItemHolder : MonoBehaviour
     {
         playerCamera = Camera.main;
 
-        // Always create a fresh HoldPoint at scene root
-        // so it NEVER inherits camera scale
         if (holdPoint == null)
         {
             holdPointObj = new GameObject("HoldPoint_Dynamic");
-            // ── KEY: parent to scene root, NOT camera ──
             holdPointObj.transform.SetParent(null);
             holdPoint = holdPointObj.transform;
         }
@@ -37,40 +33,23 @@ public class ItemHolder : MonoBehaviour
 
     void Update()
     {
-        // ── Manually sync HoldPoint to camera each frame ──
-        // This avoids ANY scale inheritance from camera or parents
         if (holdPoint != null && playerCamera != null)
-{
-    // Force camera scale before calculating position
-    playerCamera.transform.localScale = Vector3.one;
+        {
+            playerCamera.transform.localScale = Vector3.one;
+            holdPoint.position = playerCamera.transform.TransformPoint(holdPointOffset);
+            holdPoint.rotation = playerCamera.transform.rotation;
+            holdPoint.localScale = Vector3.one;
+        }
 
-    holdPoint.position = playerCamera.transform.TransformPoint(
-        holdPointOffset);
-    holdPoint.rotation = playerCamera.transform.rotation;
-    holdPoint.localScale = Vector3.one;
-}
-        // Force camera scale to always be 1,1,1
-// Prevents stretching of held items
-if (playerCamera != null &&
-    playerCamera.transform.localScale != Vector3.one)
-{
-    playerCamera.transform.localScale = Vector3.one;
-}
+        if (playerCamera != null && playerCamera.transform.localScale != Vector3.one)
+            playerCamera.transform.localScale = Vector3.one;
 
-        // Pick up with F key
         if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame)
         {
             if (inventory.Count < maxItems)
                 TryPickupItem();
             else
                 Debug.Log("Inventory full! (" + maxItems + " items max)");
-        }
-
-        // Drop with G key
-        if (Keyboard.current != null && Keyboard.current.gKey.wasPressedThisFrame)
-        {
-            if (currentItemIndex >= 0 && currentItemIndex < inventory.Count)
-                DropCurrentItem();
         }
 
         HandleItemSwitching();
@@ -100,12 +79,14 @@ if (playerCamera != null &&
                 currentItemIndex++;
                 if (currentItemIndex >= inventory.Count)
                     currentItemIndex = 0;
+                UpdateActiveItem();
             }
             else if (scroll < 0)
             {
                 currentItemIndex--;
                 if (currentItemIndex < 0)
                     currentItemIndex = inventory.Count - 1;
+                UpdateActiveItem();
             }
         }
 
@@ -124,32 +105,31 @@ if (playerCamera != null &&
 
     void UpdateActiveItem()
     {
+        // Deactivate ALL items first
         foreach (var item in inventory)
         {
-            if (item is HoldableItem holdable)
-                holdable.SetActive(false);
-            else if (item is ResetItem reset)
-                reset.SetActive(false);
+            if (item is HoldableItem h) h.SetActive(false);
+            else if (item is ResetItem r) r.SetActive(false);
         }
 
+        // Activate only the selected item
         if (currentItemIndex >= 0 && currentItemIndex < inventory.Count)
         {
-            var currentItem = inventory[currentItemIndex];
+            var current = inventory[currentItemIndex];
             string itemName = "";
 
-            if (currentItem is HoldableItem holdable)
+            if (current is HoldableItem holdable)
             {
                 holdable.SetActive(true);
                 itemName = holdable.itemName;
             }
-            else if (currentItem is ResetItem reset)
+            else if (current is ResetItem reset)
             {
                 reset.SetActive(true);
                 itemName = reset.itemName;
             }
 
-            Debug.Log("Switched to: " + itemName +
-                " (Slot " + (currentItemIndex + 1) + ")");
+            Debug.Log("Switched to: " + itemName + " (Slot " + (currentItemIndex + 1) + ")");
         }
     }
 
@@ -173,27 +153,21 @@ if (playerCamera != null &&
                 inventory.Add(reset);
                 reset.PickUp(holdPoint);
 
-                if (AdminDialogue.Instance != null &&
-                    reset.itemName.Contains("Reset"))
+                if (AdminDialogue.Instance != null && reset.itemName.Contains("Reset"))
                 {
-                    AdminDialogue.Instance.AdminInfo(
-                        "Rollback device granted.");
-                    AdminDialogue.Instance.AdminInfo(
-                        "Limited use. Use responsibly.");
+                    AdminDialogue.Instance.AdminInfo("Rollback device granted.");
+                    AdminDialogue.Instance.AdminInfo("Limited use. Use responsibly.");
                 }
 
+                // Deactivate all, then activate if it's the only item
+                DeactivateAll();
                 if (inventory.Count == 1)
                 {
                     currentItemIndex = 0;
                     reset.SetActive(true);
                 }
-                else
-                {
-                    reset.SetActive(false);
-                }
 
-                Debug.Log("Added to inventory: " + reset.itemName +
-                    " (Slot " + inventory.Count + ")");
+                Debug.Log("Added to inventory: " + reset.itemName + " (Slot " + inventory.Count + ")");
             }
         }
     }
@@ -211,44 +185,23 @@ if (playerCamera != null &&
         inventory.Add(holdable);
         holdable.PickUp(holdPoint);
 
+        // Deactivate all, then activate if it's the only item
+        DeactivateAll();
         if (inventory.Count == 1)
         {
             currentItemIndex = 0;
             holdable.SetActive(true);
         }
-        else
-        {
-            holdable.SetActive(false);
-        }
 
-        Debug.Log("Added to inventory: " + holdable.itemName +
-            " (Slot " + inventory.Count + ")");
+        Debug.Log("Added to inventory: " + holdable.itemName + " (Slot " + inventory.Count + ")");
     }
 
-    void DropCurrentItem()
+    void DeactivateAll()
     {
-        if (currentItemIndex >= 0 && currentItemIndex < inventory.Count)
+        foreach (var item in inventory)
         {
-            var item = inventory[currentItemIndex];
-
-            if (item is HoldableItem holdable)
-                holdable.Drop();
-            else if (item is ResetItem reset)
-                reset.Drop();
-
-            inventory.RemoveAt(currentItemIndex);
-
-            if (inventory.Count == 0)
-            {
-                currentItemIndex = -1;
-            }
-            else
-            {
-                currentItemIndex--;
-                if (currentItemIndex < 0)
-                    currentItemIndex = inventory.Count - 1;
-                UpdateActiveItem();
-            }
+            if (item is HoldableItem h) h.SetActive(false);
+            else if (item is ResetItem r) r.SetActive(false);
         }
     }
 
@@ -276,51 +229,47 @@ if (playerCamera != null &&
         return "";
     }
 
+    public HoldableItem GetHoldableItemByName(string itemName)
+    {
+        foreach (var item in inventory)
+        {
+            if (item is HoldableItem holdable && holdable.itemName == itemName)
+                return holdable;
+        }
+        return null;
+    }
+
+    public bool RemoveItemByName(string itemName)
+    {
+        for (int i = 0; i < inventory.Count; i++)
+        {
+            var item = inventory[i];
+            string name = "";
+
+            if (item is HoldableItem holdable) name = holdable.itemName;
+            else if (item is ResetItem reset) name = reset.itemName;
+
+            if (name == itemName)
+            {
+                inventory.RemoveAt(i);
+
+                if (inventory.Count == 0)
+                    currentItemIndex = -1;
+                else
+                {
+                    currentItemIndex = Mathf.Clamp(currentItemIndex, 0, inventory.Count - 1);
+                    UpdateActiveItem();
+                }
+
+                return true;
+            }
+        }
+        return false;
+    }
+
     void OnDestroy()
     {
-        // Clean up dynamic holdpoint on destroy
         if (holdPointObj != null)
             Destroy(holdPointObj);
     }
-
-    public HoldableItem GetHoldableItemByName(string itemName)
-{
-    foreach (var item in inventory)
-    {
-        if (item is HoldableItem holdable && holdable.itemName == itemName)
-            return holdable;
-    }
-    return null;
-}
-
-public bool RemoveItemByName(string itemName)
-{
-    for (int i = 0; i < inventory.Count; i++)
-    {
-        var item = inventory[i];
-        string name = "";
-
-        if (item is HoldableItem holdable)
-            name = holdable.itemName;
-        else if (item is ResetItem reset)
-            name = reset.itemName;
-
-        if (name == itemName)
-        {
-            inventory.RemoveAt(i);
-
-            if (inventory.Count == 0)
-                currentItemIndex = -1;
-            else
-            {
-                currentItemIndex = Mathf.Clamp(
-                    currentItemIndex, 0, inventory.Count - 1);
-                UpdateActiveItem();
-            }
-
-            return true;
-        }
-    }
-    return false;
-}
 }

@@ -37,16 +37,22 @@ public class HotbarUI : MonoBehaviour
     }
 
     void Start()
+{
+    canvasGroup = GetComponent<CanvasGroup>();
+    if (canvasGroup == null)
+        canvasGroup = gameObject.AddComponent<CanvasGroup>();
+
+    if (hideWhenEmpty)
+        canvasGroup.alpha = 0f;
+
+    if (slotsContainer == null)
     {
-        canvasGroup = GetComponent<CanvasGroup>();
-        if (canvasGroup == null)
-            canvasGroup = gameObject.AddComponent<CanvasGroup>();
-
-        if (hideWhenEmpty)
-            canvasGroup.alpha = 0f;
-
-        BuildSlots();
+        Debug.LogError("[HotbarUI] slotsContainer is not assigned in Inspector!");
+        return;
     }
+
+    BuildSlots();
+}
 
     void BuildSlots()
     {
@@ -134,18 +140,22 @@ public class HotbarUI : MonoBehaviour
     }
 
     void UpdateSlots(int count, int selectedIndex)
+{
+    for (int i = 0; i < slots.Count; i++)
     {
-        for (int i = 0; i < slots.Count; i++)
-        {
-            bool hasItem = i < count;
-            bool isSelected = i == selectedIndex;
+        if (slots[i] == null) continue;
+        if (slots[i].slotObject == null) continue;
 
-            // Background color
+        bool hasItem = i < count;
+        bool isSelected = i == selectedIndex;
+
+        if (slots[i].slotBackground != null)
             slots[i].slotBackground.color = isSelected
                 ? selectedSlotColor
                 : normalSlotColor;
 
-            // Item name
+        if (slots[i].itemText != null)
+        {
             if (hasItem)
             {
                 string name = itemHolder.GetItemNameAtIndex(i);
@@ -159,11 +169,12 @@ public class HotbarUI : MonoBehaviour
                 slots[i].itemText.text = "—";
                 slots[i].itemText.color = emptyTextColor;
             }
+        }
 
-            // Number color
+        if (slots[i].numberText != null)
             slots[i].numberText.color = isSelected
                 ? selectedTextColor
                 : numberColor;
-        }
     }
+}
 }

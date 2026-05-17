@@ -1,15 +1,12 @@
+// File: MaintenanceOverridePanel.cs
 using UnityEngine;
-
-// Attach to the override panel in the maintenance room.
-// Requires server room puzzle complete AND archive room visited.
-// Removes the barricade blocking the 4th floor stairs.
 
 public class MaintenanceOverridePanel : MonoBehaviour
 {
     [Header("References")]
     public GameObject barricade;
     public CableConnectionPuzzleManager serverPuzzle;
-    public ArchiveRoomTracker archiveTracker;       // player must visit archive first
+    public ArchiveRoomTracker archiveTracker;
 
     [Header("Dialogue")]
     public string notReadyMessage     = "Override panel — locked. Complete server room diagnostics first.";
@@ -29,7 +26,6 @@ public class MaintenanceOverridePanel : MonoBehaviour
             return;
         }
 
-        // Step 1 — server room must be done first
         if (serverPuzzle == null || !serverPuzzle.isSolved)
         {
             if (AdminDialogue.Instance != null)
@@ -37,7 +33,6 @@ public class MaintenanceOverridePanel : MonoBehaviour
             return;
         }
 
-        // Step 2 — player must have visited archive room
         if (archiveTracker == null || !archiveTracker.hasVisited)
         {
             if (AdminDialogue.Instance != null)
@@ -51,7 +46,9 @@ public class MaintenanceOverridePanel : MonoBehaviour
     void Activate()
     {
         isActivated = true;
-        Chapter1Objectives.Instance?.Complete_OverridePanel();
+
+        // Fire objective trigger — completes activate_override, adds reach_4th_floor
+        GetComponent<ObjectiveTrigger>()?.TriggerObjective();
 
         if (barricade != null)
             barricade.SetActive(false);

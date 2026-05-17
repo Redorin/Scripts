@@ -1,3 +1,4 @@
+// File: BreakerPanelPuzzle.cs
 using UnityEngine;
 
 public class BreakerPanelPuzzle : MonoBehaviour
@@ -43,8 +44,7 @@ public class BreakerPanelPuzzle : MonoBehaviour
                 if (b != null) b.SetInteractable(true);
 
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminInfo(
-                    "Panel ready. Sequential activation required.");
+                AdminDialogue.Instance.AdminInfo("Panel ready. Sequential activation required.");
         }
     }
 
@@ -58,8 +58,7 @@ public class BreakerPanelPuzzle : MonoBehaviour
             currentStep++;
 
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminInfo(
-                    "Step " + currentStep + " complete.");
+                AdminDialogue.Instance.AdminInfo("Step " + currentStep + " complete.");
 
             if (currentStep >= correctOrder.Length)
                 PuzzleSolved();
@@ -69,8 +68,7 @@ public class BreakerPanelPuzzle : MonoBehaviour
             ResetBreakers();
 
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminWarning(
-                    "Sequence violation. Failsafe triggered.");
+                AdminDialogue.Instance.AdminWarning("Sequence violation. Failsafe triggered.");
         }
     }
 
@@ -84,17 +82,17 @@ public class BreakerPanelPuzzle : MonoBehaviour
     void PuzzleSolved()
     {
         puzzleSolved = true;
-        Chapter1Objectives.Instance?.Complete_Breakers();
+
+        // Fires ObjectiveTrigger on Breaker GameObject
+        GetComponent<ObjectiveTrigger>()?.TriggerObjective();
 
         if (fuseBox != null)
             fuseBox.PowerOn();
 
         if (unlockedDoor != null)
         {
-            InteractableDoor door = unlockedDoor
-                .GetComponent<InteractableDoor>();
-            if (door != null)
-                door.enabled = true;
+            InteractableDoor door = unlockedDoor.GetComponent<InteractableDoor>();
+            if (door != null) door.enabled = true;
         }
 
         if (AdminDialogue.Instance != null)

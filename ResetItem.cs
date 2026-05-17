@@ -1,3 +1,4 @@
+// File: ResetItem.cs
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -44,6 +45,9 @@ public class ResetItem : MonoBehaviour
         transform.localPosition = holdPositionOffset;
         transform.localRotation = Quaternion.Euler(holdRotationOffset);
 
+        // Fire objective trigger on this GameObject — completes pickup_reset_device
+        GetComponent<ObjectiveTrigger>()?.TriggerObjective();
+
         Debug.Log("Picked up: " + itemName + " (Press R to use)");
     }
 
@@ -77,16 +81,15 @@ public class ResetItem : MonoBehaviour
 
         if (Physics.Raycast(ray, out hit, resetRange))
         {
-            // Priority 1 - Debris piece (resets whole group at once)
+            // Priority 1 - Debris piece
             DebrisPiece debrisPiece = hit.collider.GetComponentInParent<DebrisPiece>();
             if (debrisPiece != null)
             {
                 debrisPiece.NotifyGroup();
                 return;
-                // Instability and dialogue handled by DebrisGroup
             }
 
-            // Priority 2 - Chapter 3 student (block reset)
+            // Priority 2 - Chapter 3 student
             StudentObject student = hit.collider.GetComponentInParent<StudentObject>();
             if (student != null)
             {
@@ -105,7 +108,6 @@ public class ResetItem : MonoBehaviour
             }
 
             // Priority 4 - Normal resettable object
-            // GetComponentInParent allows collider to live on child meshes
             ResettableObject resettable = hit.collider.GetComponentInParent<ResettableObject>();
             if (resettable != null)
             {
@@ -123,7 +125,7 @@ public class ResetItem : MonoBehaviour
             }
             else
             {
-                Debug.Log("This object cannot be reset.");
+                Debug.Log("Nothing to reset.");
                 if (AdminDialogue.Instance != null)
                     AdminDialogue.Instance.AdminWarning("Target object incompatible with rollback protocol.");
             }
@@ -135,5 +137,5 @@ public class ResetItem : MonoBehaviour
     }
 
     public bool IsBeingHeld() => isBeingHeld;
-    public bool IsActive() => isActive;
+    public bool IsActive()    => isActive;
 }

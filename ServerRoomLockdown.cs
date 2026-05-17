@@ -1,36 +1,39 @@
+// File: ServerRoomLockdown.cs
 using UnityEngine;
-
-// Attach to an invisible trigger zone at the server room entrance.
-// Locks the exit door when player enters.
-// CableConnectionPuzzleManager calls Unlock() when puzzle is solved.
 
 public class ServerRoomLockdown : MonoBehaviour
 {
     [Header("References")]
     public InteractableDoor exitDoor;
-    public KeycardDoor keycardDoor;         // if exit also has keycard door
+    public KeycardDoor keycardDoor;
     public CableConnectionPuzzleManager puzzleManager;
-
-    [Header("Key Spawn")]
-    public KeySpawner keySpawner;           // spawns archive key on puzzle complete
+    public KeySpawner keySpawner;
 
     [Header("Dialogue")]
-    public string lockdownMessage   = "Emergency lockdown initiated. Complete diagnostics to restore access.";
-    public string[] entryDialogue   = {
+    public string lockdownMessage = "Emergency lockdown initiated. Complete diagnostics to restore access.";
+    public string[] entryDialogue = {
         "Arzatech server grid — offline.",
         "Identify fault and restore connection."
     };
 
     private bool hasTriggered = false;
+    private bool isReady = false;
 
     void Start()
     {
-        // Make sure exit door starts locked
         if (exitDoor != null) exitDoor.enabled = false;
+        StartCoroutine(ActivateNextFrame());
+    }
+
+    System.Collections.IEnumerator ActivateNextFrame()
+    {
+        yield return null;
+        isReady = true;
     }
 
     void OnTriggerEnter(Collider other)
     {
+        if (!isReady) return;
         if (hasTriggered) return;
         if (!other.CompareTag("Player")) return;
 
@@ -40,13 +43,10 @@ public class ServerRoomLockdown : MonoBehaviour
 
     void TriggerLockdown()
     {
-        // Lock exit
-        if (exitDoor != null) exitDoor.enabled = false;
+        if (exitDoor != null)    exitDoor.enabled       = false;
         if (keycardDoor != null) keycardDoor.isUnlocked = false;
 
-        Chapter1Objectives.Instance?.Complete_FindKeycard(); // completes "access server room"
-    Chapter1Objectives.Instance?.AddObjective_ServerRoom(); // ← ADD THIS
-    Chapter1Objectives.Instance?.AddObjective_ResetBurntSocket(); // ← ADD THIS
+        GetComponent<ObjectiveTrigger>()?.TriggerObjective();
 
         if (AdminDialogue.Instance != null)
         {
@@ -56,13 +56,11 @@ public class ServerRoomLockdown : MonoBehaviour
         }
     }
 
-    // Called by CableConnectionPuzzleManager.SolvePuzzle()
     public void Unlock()
     {
-        if (exitDoor != null) exitDoor.enabled = true;
+        if (exitDoor != null)    exitDoor.enabled       = true;
         if (keycardDoor != null) keycardDoor.isUnlocked = true;
 
-        // Spawn archive key
         if (keySpawner != null) keySpawner.SpawnKey();
 
         if (AdminDialogue.Instance != null)

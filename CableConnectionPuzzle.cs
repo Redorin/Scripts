@@ -1,15 +1,12 @@
+// File: CableConnectionPuzzle.cs
 using UnityEngine;
-
-// Attach to SocketA and SocketB.
-// Player picks up the socket (HoldableItem) and presses E near a WallPlug to connect.
-// Burnt sockets must be reset with Reset Device first.
 
 [RequireComponent(typeof(HoldableItem))]
 public class CableConnectionPuzzle : MonoBehaviour
 {
     [Header("Cable Info")]
     public string cableName = "Socket A";
-    public string cableID   = "CableA";     // Must match WallPlug's requiredCableID
+    public string cableID   = "CableA";
 
     [Header("Burnt Settings")]
     public bool isBurnt = false;
@@ -25,10 +22,12 @@ public class CableConnectionPuzzle : MonoBehaviour
     public Color connectedColor = Color.green;
 
     private HoldableItem holdable;
+    private Collider col;
 
     void Start()
     {
         holdable = GetComponent<HoldableItem>();
+        col      = GetComponent<Collider>();
 
         if (socketRenderer == null)
             socketRenderer = GetComponent<Renderer>();
@@ -36,8 +35,12 @@ public class CableConnectionPuzzle : MonoBehaviour
         UpdateVisual();
 
         // Burnt sockets can't be picked up until restored
-        if (isBurnt && holdable != null)
-            holdable.enabled = false;
+        // Disable both HoldableItem component AND collider
+        if (isBurnt)
+        {
+            if (holdable != null) holdable.enabled = false;
+            if (col != null)      col.enabled      = false;
+        }
     }
 
     // Called by BurntCableResettable when Reset Device restores it
@@ -45,19 +48,17 @@ public class CableConnectionPuzzle : MonoBehaviour
     {
         isBurnt = false;
 
-        if (holdable != null)
-            holdable.enabled = true;
-        
+        if (holdable != null) holdable.enabled = true;
+        if (col != null)      col.enabled      = true;
 
         UpdateVisual();
-        
-            Chapter1Objectives.Instance?.Complete_ResetBurntSocket();
+
+        Chapter1Objectives.Instance?.Complete_ResetBurntSocket();
+
         if (AdminDialogue.Instance != null)
-            AdminDialogue.Instance.AdminInfo(
-                cableName + " restored. Pick it up and plug it in.");
+            AdminDialogue.Instance.AdminInfo(cableName + " restored. Pick it up and plug it in.");
     }
 
-    // Called by PlayerInteraction when player presses E near a WallPlug while holding this
     public void ConnectToPlug(CableSocket wallPlug)
     {
         if (isConnected)
@@ -77,7 +78,7 @@ public class CableConnectionPuzzle : MonoBehaviour
         isConnected = true;
         wallPlug.Fill(this);
 
-        // Remove from player inventory first
+        // Remove from player inventory
         GameObject player = GameObject.FindWithTag("Player");
         if (player != null)
         {
@@ -86,25 +87,20 @@ public class CableConnectionPuzzle : MonoBehaviour
                 itemHolder.RemoveItemByName(holdable.itemName);
         }
 
-        // Snap socket to wall plug
-        transform.SetParent(wallPlug.transform);
+        // Snap to plug slot
+        Transform slot = wallPlug.plugSlot != null ? wallPlug.plugSlot : wallPlug.transform;
+        transform.SetParent(slot);
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
 
-        // Disable holdable — now fixed in wall
-        if (holdable != null)
-            holdable.enabled = false;
-
-        // Disable collider so player doesn't re-interact
-        Collider col = GetComponent<Collider>();
-        if (col != null) col.enabled = false;
+        if (holdable != null) holdable.enabled = false;
+        if (col != null)      col.enabled      = false;
 
         UpdateVisual();
 
         if (AdminDialogue.Instance != null)
             AdminDialogue.Instance.AdminInfo(cableName + " plugged in.");
 
-        // Notify manager
         CableConnectionPuzzleManager manager =
             FindFirstObjectByType<CableConnectionPuzzleManager>();
         if (manager != null)

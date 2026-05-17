@@ -1,7 +1,5 @@
+// File: KeycardDoor.cs
 using UnityEngine;
-
-// Attach to a door that requires a keycard.
-// Works alongside InteractableDoor — disable InteractableDoor until keycard is used.
 
 public class KeycardDoor : MonoBehaviour
 {
@@ -9,15 +7,15 @@ public class KeycardDoor : MonoBehaviour
     public string requiredKeycardName = "ArzatechKeycard";
 
     [Header("Dialogue")]
-    public string noKeycardMessage  = "Keycard required for access.";
-    public string wrongCardMessage  = "Invalid keycard.";
-    public string accessGranted     = "Access granted. Welcome to Arzatech Server Room.";
+    public string noKeycardMessage = "Keycard required for access.";
+    public string accessGranted    = "Access granted. Welcome to Arzatech Server Room.";
 
     [Header("State")]
     public bool isUnlocked = false;
 
     private InteractableDoor door;
     private ItemHolder itemHolder;
+    private bool keycardObjectiveShown = false;
 
     void Start()
     {
@@ -25,7 +23,6 @@ public class KeycardDoor : MonoBehaviour
         if (door == null)
             door = GetComponentInChildren<InteractableDoor>();
 
-        // Lock the door until keycard is used
         if (door != null) door.enabled = false;
 
         GameObject player = GameObject.FindWithTag("Player");
@@ -43,7 +40,7 @@ public class KeycardDoor : MonoBehaviour
 
         if (itemHolder == null) return;
 
-        // Check inventory for keycard
+        // Check if keycard is anywhere in inventory
         bool hasCard = false;
         for (int i = 0; i < itemHolder.GetInventoryCount(); i++)
         {
@@ -56,10 +53,29 @@ public class KeycardDoor : MonoBehaviour
 
         if (hasCard)
         {
+            // If find_keycard is already complete, player already had it
+            // Just unlock without adding use_keycard objective
+            bool alreadyKnewAboutKeycard = ObjectiveManager.Instance != null &&
+                ObjectiveManager.Instance.IsComplete("find_keycard");
+
+            if (!alreadyKnewAboutKeycard)
+            {
+                // Player found the keycard and is now using it
+                ObjectiveManager.Instance?.Add("use_keycard");
+                ObjectiveManager.Instance?.Complete("use_keycard");
+            }
+
             Unlock();
         }
         else
         {
+            // Player doesn't have the keycard — tell them to find it
+            if (!keycardObjectiveShown)
+            {
+                keycardObjectiveShown = true;
+                ObjectiveManager.Instance?.Add("find_keycard");
+            }
+
             if (AdminDialogue.Instance != null)
                 AdminDialogue.Instance.AdminWarning(noKeycardMessage);
         }
@@ -74,7 +90,6 @@ public class KeycardDoor : MonoBehaviour
         if (AdminDialogue.Instance != null)
             AdminDialogue.Instance.AdminInfo(accessGranted);
 
-        // Open immediately on first use
         if (door != null) door.Interact();
     }
 }

@@ -1,153 +1,266 @@
+// File: ObjectiveManager.cs
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
+
+[System.Serializable]
+public class ObjectiveDefinition
+{
+    public string id;
+    [TextArea(1, 2)]
+    public string displayText;
+    public bool addOnStart = false;
+    [Tooltip("Set > 0 to make this a counter objective e.g. (0/2)")]
+    public int counterTarget = 0;
+}
 
 public class ObjectiveManager : MonoBehaviour
 {
     public static ObjectiveManager Instance { get; private set; }
 
-    [Header("HUD — appears briefly when objective added/completed")]
-    public CanvasGroup hudPanel;            // fades in/out
-    public TextMeshProUGUI hudText;         // shows the new/completed objective
-    public float hudDisplayDuration = 10f;
-    public float hudFadeDuration = 1f;
+    [Header("Objective Definitions")]
+    public ObjectiveDefinition[] objectiveDefinitions;
+
+    [Header("HUD — always visible on screen")]
+    public CanvasGroup hudPanel;
+    public TextMeshProUGUI hudText;
 
     [Header("Pause Menu Objectives Panel")]
-    public GameObject objectivesPanel;      // right side panel in pause menu
-    public Transform objectiveListParent;   // vertical layout group parent
-    public GameObject objectiveEntryPrefab; // prefab: TextMeshProUGUI
+    public GameObject objectivesPanel;
+    public Transform objectiveListParent;
+    public GameObject objectiveEntryPrefab;
 
     [Header("Colors")]
-    public Color activeColor   = new Color(0f, 0.86f, 1f, 1f);   // cyan
-    public Color completedColor = new Color(0.4f, 0.4f, 0.4f, 1f); // grey
+    public Color activeColor    = new Color(0f, 0.86f, 1f, 1f);
+    public Color completedColor = new Color(0.4f, 0.4f, 0.4f, 1f);
 
-    private class Objective
+    [Header("Completed Objective Behaviour")]
+    public float completedHoldDuration = 3f;
+    public float completedFadeDuration = 1f;
+
+    private class ObjectiveState
     {
-        public string text;
+        public string id;
+        public string displayText;
         public bool isCompleted;
+        public bool isRemoved;
         public TextMeshProUGUI uiEntry;
+        public int counterCurrent;
+        public int counterTarget;
+        public bool isCounter => counterTarget > 0;
     }
 
-    private List<Objective> objectives = new List<Objective>();
-    private Coroutine hudCoroutine;
+    private Dictionary<string, ObjectiveDefinition> definitionLookup
+        = new Dictionary<string, ObjectiveDefinition>();
+    private List<ObjectiveState> activeObjectives = new List<ObjectiveState>();
+    private Dictionary<string, ObjectiveState> activeLookup
+        = new Dictionary<string, ObjectiveState>();
 
     void Awake()
     {
         if (Instance == null) Instance = this;
         else { Destroy(gameObject); return; }
         DontDestroyOnLoad(gameObject);
+
+        if (objectiveDefinitions != null)
+            foreach (var def in objectiveDefinitions)
+                if (!string.IsNullOrEmpty(def.id))
+                    definitionLookup[def.id] = def;
     }
 
     void Start()
     {
         if (hudPanel != null)
         {
-            hudPanel.alpha = 0f;
-            hudPanel.gameObject.SetActive(false);
+            hudPanel.alpha = 1f;
+            hudPanel.gameObject.SetActive(true);
         }
+
+        if (objectivesPanel != null)
+            objectivesPanel.SetActive(false);
+
+        if (objectiveDefinitions != null)
+            foreach (var def in objectiveDefinitions)
+                if (def.addOnStart) Add(def.id);
+
+        RefreshHUD();
     }
 
     // ── PUBLIC API ──
 
-    // Add a new objective
-    public void AddObjective(string text)
+    public void Add(string id)
     {
-        Objective obj = new Objective { text = text, isCompleted = false };
-        objectives.Add(obj);
+        if (activeLookup.ContainsKey(id))
+        {
+            Debug.LogWarning("[ObjectiveManager] Already added: " + id);
+            return;
+        }
 
-        // Create UI entry in pause menu list
+        if (!definitionLookup.TryGetValue(id, out ObjectiveDefinition def))
+        {
+            Debug.LogWarning("[ObjectiveManager] No definition for ID: " + id);
+            return;
+        }
+
+        ObjectiveState state = new ObjectiveState
+        {
+            id             = id,
+            displayText    = def.displayText,
+            isCompleted    = false,
+            isRemoved      = false,
+            counterCurrent = 0,
+            counterTarget  = def.counterTarget
+        };
+
+        activeObjectives.Add(state);
+        activeLookup[id] = state;
+
         if (objectiveListParent != null && objectiveEntryPrefab != null)
         {
             GameObject entry = Instantiate(objectiveEntryPrefab, objectiveListParent);
             TextMeshProUGUI tmp = entry.GetComponent<TextMeshProUGUI>();
             if (tmp != null)
             {
-                tmp.text = "• " + text;
+                tmp.text  = FormatText(state);
                 tmp.color = activeColor;
-                obj.uiEntry = tmp;
+                state.uiEntry = tmp;
             }
         }
 
-        ShowHUD("• " + text, false);
+        RefreshHUD();
     }
 
-    // Complete an existing objective by exact text match
-    public void CompleteObjective(string text)
+    public void Complete(string id)
     {
-        foreach (Objective obj in objectives)
+        if (!activeLookup.TryGetValue(id, out ObjectiveState state))
         {
-            if (obj.text == text && !obj.isCompleted)
-            {
-                obj.isCompleted = true;
-
-                if (obj.uiEntry != null)
-                {
-                    obj.uiEntry.text = "<s>✓ " + obj.text + "</s>";
-                    obj.uiEntry.color = completedColor;
-                }
-
-                ShowHUD("✓ " + text, true);
-                break;
-            }
+            Debug.LogWarning("[ObjectiveManager] Not found or not added: " + id);
+            return;
         }
+
+        if (state.isCompleted) return;
+
+        state.isCompleted = true;
+
+        if (state.uiEntry != null)
+        {
+            state.uiEntry.text  = "<s>✓ " + state.displayText + "</s>";
+            state.uiEntry.color = completedColor;
+        }
+
+        RefreshHUD();
+        StartCoroutine(FadeOutCompleted(state));
     }
 
-    // Add and immediately complete (for objectives that complete instantly)
-    public void AddAndComplete(string text)
+    // Increment counter objective — auto-completes when target reached
+    public void IncrementCounter(string id)
     {
-        AddObjective(text);
-        CompleteObjective(text);
+        if (!activeLookup.TryGetValue(id, out ObjectiveState state))
+        {
+            Debug.LogWarning("[ObjectiveManager] Counter objective not found: " + id);
+            return;
+        }
+
+        if (state.isCompleted) return;
+        if (!state.isCounter) return;
+
+        state.counterCurrent++;
+        state.counterCurrent = Mathf.Min(state.counterCurrent, state.counterTarget);
+
+        if (state.uiEntry != null)
+            state.uiEntry.text = FormatText(state);
+
+        RefreshHUD();
+
+        if (state.counterCurrent >= state.counterTarget)
+            Complete(id);
+    }
+
+    public void AddAndComplete(string id)
+    {
+        Add(id);
+        Complete(id);
+    }
+
+    public bool IsComplete(string id)
+    {
+        if (activeLookup.TryGetValue(id, out ObjectiveState state))
+            return state.isCompleted;
+        return false;
+    }
+
+    public bool IsAdded(string id) => activeLookup.ContainsKey(id);
+
+    // ── FORMATTING ──
+
+    string FormatText(ObjectiveState state)
+    {
+        if (state.isCounter)
+            return "• " + state.displayText + " (" + state.counterCurrent + "/" + state.counterTarget + ")";
+        return "• " + state.displayText;
+    }
+
+    // ── FADE OUT ──
+
+    IEnumerator FadeOutCompleted(ObjectiveState state)
+    {
+        yield return new WaitForSeconds(completedHoldDuration);
+
+        if (state.uiEntry != null)
+        {
+            float elapsed = 0f;
+            Color startColor = state.uiEntry.color;
+
+            while (elapsed < completedFadeDuration)
+            {
+                float t = elapsed / completedFadeDuration;
+                if (state.uiEntry != null)
+                    state.uiEntry.color = Color.Lerp(startColor, Color.clear, t);
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            if (state.uiEntry != null)
+            {
+                Destroy(state.uiEntry.gameObject);
+                state.uiEntry = null;
+            }
+        }
+
+        state.isRemoved = true;
+        activeObjectives.Remove(state);
+        activeLookup.Remove(state.id);
+
+        RefreshHUD();
     }
 
     // ── HUD ──
 
-    void ShowHUD(string text, bool isCompletion)
+    void RefreshHUD()
     {
         if (hudPanel == null || hudText == null) return;
 
-        if (hudCoroutine != null)
-            StopCoroutine(hudCoroutine);
+        bool hasActive = false;
+        string display = "<b>OBJECTIVES</b>\n";
 
-        hudCoroutine = StartCoroutine(HUDSequence(text, isCompletion));
-    }
-
-    IEnumerator HUDSequence(string text, bool isCompletion)
-    {
-        hudText.text = text;
-        hudText.color = isCompletion ? completedColor : activeColor;
-
-        hudPanel.gameObject.SetActive(true);
-
-        // Fade in
-        float elapsed = 0f;
-        while (elapsed < hudFadeDuration)
+        foreach (ObjectiveState state in activeObjectives)
         {
-            hudPanel.alpha = Mathf.Lerp(0f, 1f, elapsed / hudFadeDuration);
-            elapsed += Time.unscaledDeltaTime; // unscaled so it works when paused
-            yield return null;
-        }
-        hudPanel.alpha = 1f;
+            if (state.isRemoved) continue;
+            hasActive = true;
 
-        // Hold
-        yield return new WaitForSecondsRealtime(hudDisplayDuration);
-
-        // Fade out
-        elapsed = 0f;
-        while (elapsed < hudFadeDuration)
-        {
-            hudPanel.alpha = Mathf.Lerp(1f, 0f, elapsed / hudFadeDuration);
-            elapsed += Time.unscaledDeltaTime;
-            yield return null;
+            if (state.isCompleted)
+                display += "<color=#666666><s>✓ " + state.displayText + "</s></color>\n";
+            else if (state.isCounter)
+                display += "<color=#00DBFF>• " + state.displayText +
+                           " (" + state.counterCurrent + "/" + state.counterTarget + ")</color>\n";
+            else
+                display += "<color=#00DBFF>• " + state.displayText + "</color>\n";
         }
 
-        hudPanel.alpha = 0f;
-        hudPanel.gameObject.SetActive(false);
-        hudCoroutine = null;
+        hudText.text = hasActive ? display.TrimEnd() : "";
     }
 
-    // Called by PauseMenuManager to show/hide objectives panel
     public void SetObjectivesPanelVisible(bool visible)
     {
         if (objectivesPanel != null)

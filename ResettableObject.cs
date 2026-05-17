@@ -1,8 +1,10 @@
 using UnityEngine;
 using System.Collections;
+using System;
 
 public class ResettableObject : MonoBehaviour
 {
+    [HideInInspector] public Action OnResetSuccess;
     [Header("Object Info")]
     public string objectName = "Object";
     public bool canBeReset = true;
@@ -144,9 +146,14 @@ public class ResettableObject : MonoBehaviour
                     "Maximum corrections applied to this object.");
         }
 
-        return true;
+        OnResetSuccess?.Invoke();
+return true;
     }
 
+public void ResetUseCount()
+{
+    currentUses = 0;
+}
     // ── Instant restore ──────────────────────────────────────────────────────
     void RestoreToOriginal()
     {

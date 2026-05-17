@@ -10,6 +10,10 @@ public class DebrisGroup : MonoBehaviour
     [Header("Debris Pieces")]
     public GameObject[] debrisPieces;
 
+    // Add this field at the top with the other headers:
+[Header("Barrier")]
+public DebrisBarrier debrisBarrier;
+
     [Header("Animation Settings")]
     public float resetDuration = 1.2f;
     public AnimationCurve resetCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
@@ -135,6 +139,9 @@ public class DebrisGroup : MonoBehaviour
             foreach (string line in resetDialogue)
                 AdminDialogue.Instance.AdminWarning(line);
         }
+
+        if (debrisBarrier != null)
+    debrisBarrier.OnDebrisReset();
 
         Debug.Log("All debris animated back to ceiling.");
     }

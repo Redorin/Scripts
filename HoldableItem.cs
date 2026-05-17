@@ -1,3 +1,4 @@
+// File: HoldableItem.cs
 using UnityEngine;
 
 public class HoldableItem : MonoBehaviour
@@ -8,6 +9,10 @@ public class HoldableItem : MonoBehaviour
     [Header("Hold Settings")]
     public Vector3 holdPositionOffset = Vector3.zero;
     public Vector3 holdRotationOffset = Vector3.zero;
+
+    [Header("Objective Counter (Optional)")]
+    [Tooltip("If set, increments this objective counter when picked up")]
+    public string pickupCounterObjectiveID = "";
 
     private Rigidbody rb;
     private Collider itemCollider;
@@ -37,15 +42,14 @@ public class HoldableItem : MonoBehaviour
         if (itemCollider != null)
             itemCollider.enabled = false;
 
-        // Attach to hold point
         transform.SetParent(holdPoint);
         transform.localPosition = holdPositionOffset;
         transform.localRotation = Quaternion.Euler(holdRotationOffset);
-
-        // ── FORCE scale to always be original ──
-        // Since nuclear fix makes HoldPoint scale 1,1,1
-        // localScale == worldScale so just use original
         transform.localScale = originalLocalScale;
+
+        // Increment objective counter if assigned
+        if (!string.IsNullOrEmpty(pickupCounterObjectiveID))
+            ObjectiveManager.Instance?.IncrementCounter(pickupCounterObjectiveID);
 
         Debug.Log("Picked up: " + itemName);
     }
@@ -79,5 +83,5 @@ public class HoldableItem : MonoBehaviour
     }
 
     public bool IsBeingHeld() => isBeingHeld;
-    public bool IsActive() => isActive;
+    public bool IsActive()    => isActive;
 }

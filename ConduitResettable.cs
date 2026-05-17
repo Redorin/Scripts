@@ -1,3 +1,4 @@
+// File: ConduitResettable.cs
 using UnityEngine;
 
 public class ConduitResettable : MonoBehaviour
@@ -14,27 +15,24 @@ public class ConduitResettable : MonoBehaviour
     {
         resetCount++;
 
-        // If all parts are reset (or no parts assigned, treat as single object)
         int required = conduitParts != null && conduitParts.Length > 0
-            ? conduitParts.Length
-            : 1;
+            ? conduitParts.Length : 1;
 
         if (resetCount >= required)
         {
             if (breakerPanel != null)
                 breakerPanel.SetConduitReset(true);
 
-            if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminInfo(
-                    "Conduit restored. Power path clear.");
+            // Fire objective trigger — completes reset_conduit, adds activate_breakers
+            GetComponent<ObjectiveTrigger>()?.TriggerObjective();
 
-                    Chapter1Objectives.Instance?.Complete_ResetConduit();
+            if (AdminDialogue.Instance != null)
+                AdminDialogue.Instance.AdminInfo("Conduit restored. Power path clear.");
         }
         else
         {
             if (AdminDialogue.Instance != null)
-                AdminDialogue.Instance.AdminInfo(
-                    "Partial restoration. Conduit still damaged.");
+                AdminDialogue.Instance.AdminInfo("Partial restoration. Conduit still damaged.");
         }
     }
 }

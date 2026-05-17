@@ -26,6 +26,9 @@ public class CollapseAgain : MonoBehaviour
         "Find another way."
     };
 
+    [Header("Barrier")]
+public DebrisBarrier debrisBarrier;
+
     private bool hasTriggered = false;
     private Camera playerCamera;
     private Vector3 originalCameraPos;
@@ -64,7 +67,12 @@ public class CollapseAgain : MonoBehaviour
         if (!other.CompareTag("Player")) return;
 
         hasTriggered = true;
+
+        //Chapter1Objectives.Instance?.Complete_FindWayOut();
+        //Chapter1Objectives.Instance?.Complete_FindAnotherWay();
+
         StartCoroutine(CollapseSequence());
+
     }
 
     IEnumerator CollapseSequence()
@@ -78,6 +86,9 @@ public class CollapseAgain : MonoBehaviour
             Rigidbody rb = debris.GetComponent<Rigidbody>();
             if (rb != null) rb.isKinematic = false;
         }
+
+        if (debrisBarrier != null)
+    debrisBarrier.OnCollapseAgain();
 
         // Drop shelves (with optional extra delay)
         StartCoroutine(DropShelves());

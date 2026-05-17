@@ -1,8 +1,6 @@
+// File: Chapter1Objectives.cs
+// ============================================================================
 using UnityEngine;
-
-// Attach to an empty GameObject in Chapter 1 scene.
-// Call these methods from the relevant puzzle scripts at the right moments.
-// All methods are static-callable via Chapter1Objectives.Instance
 
 public class Chapter1Objectives : MonoBehaviour
 {
@@ -14,172 +12,140 @@ public class Chapter1Objectives : MonoBehaviour
         else Destroy(gameObject);
     }
 
-    void Start()
-    {
-        // First objective added on scene load
-        AddObjective_FindWayOut();
-    }
-
     // ── MAIN ROOM ──
-
-    public void AddObjective_FindWayOut()
-    {
-        ObjectiveManager.Instance?.AddObjective("Find a way out of the lecture hall");
-    }
 
     public void Complete_FindWayOut()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Find a way out of the lecture hall");
-        AddObjective_PickUpResetDevice();
-    }
-
-    public void AddObjective_PickUpResetDevice()
-    {
-        ObjectiveManager.Instance?.AddObjective("Pick up the Reset Device");
+        ObjectiveManager.Instance?.Complete("find_way_out");
+        ObjectiveManager.Instance?.Add("pickup_reset_device");
     }
 
     public void Complete_PickUpResetDevice()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Pick up the Reset Device");
+        ObjectiveManager.Instance?.Complete("pickup_reset_device");
+        ObjectiveManager.Instance?.Add("find_another_way");
     }
 
     // ── HALLWAY ──
 
-    public void AddObjective_FindAnotherWay()
-    {
-        ObjectiveManager.Instance?.AddObjective("Find another way — hallway is blocked");
-    }
-
     public void Complete_FindAnotherWay()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Find another way — hallway is blocked");
+        ObjectiveManager.Instance?.Complete("find_another_way");
+        ObjectiveManager.Instance?.Add("restore_power");
+        ObjectiveManager.Instance?.Add("find_fuse");
     }
 
     // ── MAINTENANCE ROOM ──
 
-    public void AddObjective_RestorePower()
-    {
-        ObjectiveManager.Instance?.AddObjective("Restore power to the maintenance room");
-    }
-
-    public void AddObjective_FindFuse()
-    {
-        ObjectiveManager.Instance?.AddObjective("Locate replacement fuses");
-    }
-
     public void Complete_FindFuse()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Locate replacement fuses");
-        ObjectiveManager.Instance?.AddObjective("Insert fuses into the fuse box");
+        ObjectiveManager.Instance?.Complete("find_fuse");
+        ObjectiveManager.Instance?.Add("insert_fuses");
     }
 
     public void Complete_InsertFuses()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Insert fuses into the fuse box");
-        ObjectiveManager.Instance?.AddObjective("Reset the damaged power conduit");
+        ObjectiveManager.Instance?.Complete("insert_fuses");
+        ObjectiveManager.Instance?.Add("reset_conduit");
     }
 
     public void Complete_ResetConduit()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Reset the damaged power conduit");
-        ObjectiveManager.Instance?.AddObjective("Activate breakers in correct sequence");
+        ObjectiveManager.Instance?.Complete("reset_conduit");
+        ObjectiveManager.Instance?.Add("activate_breakers");
     }
 
     public void Complete_Breakers()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Activate breakers in correct sequence");
-        ObjectiveManager.Instance?.CompleteObjective("Restore power to the maintenance room");
-        ObjectiveManager.Instance?.AddObjective("Find the Arzatech keycard");
+        ObjectiveManager.Instance?.Complete("activate_breakers");
+        ObjectiveManager.Instance?.Complete("restore_power");
+        ObjectiveManager.Instance?.Add("find_keycard");
     }
 
     public void Complete_FindKeycard()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Find the Arzatech keycard");
-        ObjectiveManager.Instance?.AddObjective("Access the Arzatech server room");
+        ObjectiveManager.Instance?.Complete("find_keycard");
+        ObjectiveManager.Instance?.Add("access_server_room");
     }
 
     // ── SERVER ROOM ──
 
-    public void AddObjective_ServerRoom()
+    public void Add_ServerRoom()
     {
-        ObjectiveManager.Instance?.AddObjective("Restore the server room connection");
-    }
-
-    public void AddObjective_ResetBurntSocket()
-    {
-        ObjectiveManager.Instance?.AddObjective("Reset the damaged cable socket");
+        ObjectiveManager.Instance?.Add("restore_server_connection");
+        ObjectiveManager.Instance?.Add("reset_burnt_socket");
     }
 
     public void Complete_ResetBurntSocket()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Reset the damaged cable socket");
-        ObjectiveManager.Instance?.AddObjective("Connect both cable sockets to wall plugs");
+        ObjectiveManager.Instance?.Complete("reset_burnt_socket");
+        ObjectiveManager.Instance?.Add("connect_cables");
     }
 
     public void Complete_ConnectCables()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Connect both cable sockets to wall plugs");
-        ObjectiveManager.Instance?.AddObjective("Boot servers in correct sequence");
+        ObjectiveManager.Instance?.Complete("connect_cables");
+        ObjectiveManager.Instance?.Add("boot_servers");
     }
 
     public void Complete_BootServers()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Boot servers in correct sequence");
-        ObjectiveManager.Instance?.CompleteObjective("Restore the server room connection");
-        ObjectiveManager.Instance?.CompleteObjective("Access the Arzatech server room");
-        ObjectiveManager.Instance?.AddObjective("Retrieve the archive room key");
+        ObjectiveManager.Instance?.Complete("boot_servers");
+        ObjectiveManager.Instance?.Complete("restore_server_connection");
+        ObjectiveManager.Instance?.Complete("access_server_room");
+        ObjectiveManager.Instance?.Add("retrieve_archive_key");
     }
 
     public void Complete_GetArchiveKey()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Retrieve the archive room key");
-        ObjectiveManager.Instance?.AddObjective("Access the archive room");
+        ObjectiveManager.Instance?.Complete("retrieve_archive_key");
+        ObjectiveManager.Instance?.Add("access_archive");
     }
 
     // ── ARCHIVE ROOM ──
 
     public void Complete_AccessArchive()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Access the archive room");
-        ObjectiveManager.Instance?.AddObjective("Investigate the archive room");
+        ObjectiveManager.Instance?.Complete("access_archive");
+        ObjectiveManager.Instance?.Add("investigate_archive");
     }
 
     public void Complete_InvestigateArchive()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Investigate the archive room");
-        ObjectiveManager.Instance?.AddObjective("Return to the maintenance room");
+        ObjectiveManager.Instance?.Complete("investigate_archive");
+        ObjectiveManager.Instance?.Add("return_to_maintenance");
     }
 
     // ── OVERRIDE PANEL ──
 
     public void Complete_ReturnToMaintenance()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Return to the maintenance room");
-        ObjectiveManager.Instance?.AddObjective("Activate the maintenance override panel");
+        ObjectiveManager.Instance?.Complete("return_to_maintenance");
+        ObjectiveManager.Instance?.Add("activate_override");
     }
 
     public void Complete_OverridePanel()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Activate the maintenance override panel");
-        ObjectiveManager.Instance?.AddObjective("Reach the 4th floor");
+        ObjectiveManager.Instance?.Complete("activate_override");
+        ObjectiveManager.Instance?.Add("reach_4th_floor");
     }
 
     // ── FOURTH FLOOR ──
 
-    public void AddObjective_CrackedPanel()
+    public void Add_CrackedPanel()
     {
-        ObjectiveManager.Instance?.AddObjective("Reset the cracked floor panel");
+        ObjectiveManager.Instance?.Add("reset_cracked_panel");
     }
 
     public void Complete_CrackedPanel()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Reset the cracked floor panel");
-        ObjectiveManager.Instance?.AddObjective("Reach the sector transfer point");
+        ObjectiveManager.Instance?.Complete("reset_cracked_panel");
+        ObjectiveManager.Instance?.Add("reach_transfer_point");
     }
 
     public void Complete_Chapter1()
     {
-        ObjectiveManager.Instance?.CompleteObjective("Reach the sector transfer point");
-        ObjectiveManager.Instance?.CompleteObjective("Reach the 4th floor");
+        ObjectiveManager.Instance?.Complete("reach_transfer_point");
+        ObjectiveManager.Instance?.Complete("reach_4th_floor");
     }
 }

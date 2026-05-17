@@ -1,7 +1,5 @@
+// File: CableSocket.cs
 using UnityEngine;
-
-// Attach to WallPlugA and WallPlugB.
-// When player presses E while holding the matching socket, it connects.
 
 public class CableSocket : MonoBehaviour
 {
@@ -9,26 +7,24 @@ public class CableSocket : MonoBehaviour
     public string requiredCableID = "CableA";
     public bool isFilled = false;
 
-    [Header("Visual")]
-    public Renderer plugRenderer;
-    public Color emptyColor  = Color.red;
-    public Color filledColor = Color.green;
+    [Header("Plug Slot")]
+    public Transform plugSlot;
+
+    [Header("Visuals")]
+    public GameObject emptyVisual;
+    public GameObject filledVisual;
 
     private ItemHolder itemHolder;
 
     void Start()
     {
-        if (plugRenderer == null)
-            plugRenderer = GetComponent<Renderer>();
-
-        UpdateVisual();
-
         GameObject player = GameObject.FindWithTag("Player");
         if (player != null)
             itemHolder = player.GetComponent<ItemHolder>();
+
+        UpdateVisual();
     }
 
-    // Called by PlayerInteraction when player presses E on this wall plug
     public void Interact()
     {
         if (isFilled)
@@ -40,41 +36,32 @@ public class CableSocket : MonoBehaviour
 
         if (itemHolder == null) return;
 
-        // Check if player is holding the matching socket
         CableConnectionPuzzle heldSocket = FindHeldMatchingSocket();
 
         if (heldSocket != null)
-        {
             heldSocket.ConnectToPlug(this);
-        }
         else
-        {
             if (AdminDialogue.Instance != null)
                 AdminDialogue.Instance.AdminInfo(
                     "No compatible socket in hand. Required: " + requiredCableID);
-        }
     }
 
     CableConnectionPuzzle FindHeldMatchingSocket()
     {
         if (itemHolder == null) return null;
+        if (itemHolder.holdPoint == null) return null;
 
-        for (int i = 0; i < itemHolder.GetInventoryCount(); i++)
+        foreach (Transform child in itemHolder.holdPoint)
         {
-            string name = itemHolder.GetItemNameAtIndex(i);
+            // Must be the ACTIVE item in hand
+            HoldableItem holdable = child.GetComponent<HoldableItem>();
+            if (holdable == null || !holdable.IsActive()) continue;
 
-            // Find the actual held object — check holdpoint children
-            if (itemHolder.holdPoint != null)
-            {
-                foreach (Transform child in itemHolder.holdPoint)
-                {
-                    CableConnectionPuzzle socket =
-                        child.GetComponent<CableConnectionPuzzle>();
-                    if (socket != null && socket.cableID == requiredCableID)
-                        return socket;
-                }
-            }
+            CableConnectionPuzzle socket = child.GetComponent<CableConnectionPuzzle>();
+            if (socket != null && socket.cableID == requiredCableID)
+                return socket;
         }
+
         return null;
     }
 
@@ -82,12 +69,11 @@ public class CableSocket : MonoBehaviour
     {
         isFilled = true;
         UpdateVisual();
-        Debug.Log(gameObject.name + " filled by " + socket.cableID);
     }
 
     void UpdateVisual()
     {
-        if (plugRenderer != null)
-            plugRenderer.material.color = isFilled ? filledColor : emptyColor;
+        if (emptyVisual != null)  emptyVisual.SetActive(!isFilled);
+        if (filledVisual != null) filledVisual.SetActive(isFilled);
     }
 }

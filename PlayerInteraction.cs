@@ -1,3 +1,7 @@
+// File: PlayerInteraction.cs
+// E key = interact with world objects
+// F key = pick up items (handled by ItemHolder)
+// R key = use Reset Device (handled by ResetItem)
 using UnityEngine;
 using UnityEngine.InputSystem;
 using TMPro;
@@ -12,6 +16,10 @@ public class PlayerInteraction : MonoBehaviour
     public GameObject interactionPrompt;
     public TextMeshProUGUI interactionTooltip;
 
+    [Header("Tooltip Text")]
+    public string interactTooltipText = "[E] Interact";
+    public string pickupTooltipText = "[F] Pick Up";
+
     [Header("Crosshair")]
     public TextMeshProUGUI crosshairText;
     public string normalCrosshair = "+";
@@ -25,10 +33,10 @@ public class PlayerInteraction : MonoBehaviour
     private DoorWithTrap currentTrapDoor;
     private InteractableObject currentObject;
     private Teleporter currentTeleporter;
-    private HoldableItem currentHoldableItem;
     private ItemHolder itemHolder;
     private PatternAnchor currentPatternAnchor;
     private LightSwitchToggle currentLightSwitch;
+    private LightSwitch currentLightSwitchNew;
     private FuseBoxPuzzle currentFuseBox;
     private CableConnectionPuzzle currentCable;
     private CableSocket currentCableSocket;
@@ -44,6 +52,8 @@ public class PlayerInteraction : MonoBehaviour
     private LockedObject currentLockedObject;
     private KeycardDoor currentKeycardDoor;
     private MaintenanceOverridePanel currentOverridePanel;
+    private HoldableItem currentPickupItem;
+    private ResetItem currentPickupReset;
 
     void Start()
     {
@@ -82,6 +92,8 @@ public class PlayerInteraction : MonoBehaviour
                 currentPatternAnchor.Interact();
             else if (currentLightSwitch != null)
                 currentLightSwitch.Toggle();
+            else if (currentLightSwitchNew != null)
+                currentLightSwitchNew.Interact();
             else if (currentFuseBox != null)
                 currentFuseBox.Interact();
             else if (currentCableSocket != null)
@@ -104,8 +116,6 @@ public class PlayerInteraction : MonoBehaviour
                 currentChapter4Choice.Interact();
             else if (currentCh3To4 != null)
                 currentCh3To4.Interact();
-            else if (currentHoldableItem != null)
-                itemHolder.AddToInventory(currentHoldableItem);
         }
     }
 
@@ -116,77 +126,91 @@ public class PlayerInteraction : MonoBehaviour
 
         if (Physics.Raycast(ray, out hit, interactionDistance))
         {
-            CeilingCollapseOnDoor collapseOnDoor = hit.collider
-                .GetComponentInParent<CeilingCollapseOnDoor>();
-            if (collapseOnDoor != null) { SetOnly(collapseOnDoor: collapseOnDoor); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            // ── PICKUP ITEMS (F key prompt) ──
+            HoldableItem pickable = hit.collider.GetComponent<HoldableItem>();
+            if (pickable == null) pickable = hit.collider.GetComponentInParent<HoldableItem>();
+            if (pickable != null && !pickable.IsBeingHeld() && pickable.enabled)
+            {
+                ClearAll();
+                currentPickupItem = pickable;
+                ShowPrompt(pickupTooltipText);
+                SetCrosshairInteract();
+                return;
+            }
 
-            MaintenanceRoomDoor maintenanceDoor = hit.collider
-                .GetComponentInParent<MaintenanceRoomDoor>();
-            if (maintenanceDoor != null) { SetOnly(maintenanceDoor: maintenanceDoor); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            ResetItem resetPickable = hit.collider.GetComponent<ResetItem>();
+            if (resetPickable != null && !resetPickable.IsBeingHeld())
+            {
+                ClearAll();
+                currentPickupReset = resetPickable;
+                ShowPrompt(pickupTooltipText);
+                SetCrosshairInteract();
+                return;
+            }
 
-            ArchivesDoor archivesDoor = hit.collider
-                .GetComponentInParent<ArchivesDoor>();
-            if (archivesDoor != null) { SetOnly(archivesDoor: archivesDoor); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            // ── INTERACTABLES (E key prompt) ──
+            CeilingCollapseOnDoor collapseOnDoor = hit.collider.GetComponentInParent<CeilingCollapseOnDoor>();
+            if (collapseOnDoor != null) { SetOnly(collapseOnDoor: collapseOnDoor); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
-            InteractableDoor door = hit.collider
-                .GetComponentInParent<InteractableDoor>();
-            if (door != null && door.enabled) { SetOnly(door: door); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            MaintenanceRoomDoor maintenanceDoor = hit.collider.GetComponentInParent<MaintenanceRoomDoor>();
+            if (maintenanceDoor != null) { SetOnly(maintenanceDoor: maintenanceDoor); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
-            DoorWithTrap trapDoor = hit.collider
-                .GetComponentInParent<DoorWithTrap>();
-            if (trapDoor != null) { SetOnly(trapDoor: trapDoor); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            ArchivesDoor archivesDoor = hit.collider.GetComponentInParent<ArchivesDoor>();
+            if (archivesDoor != null) { SetOnly(archivesDoor: archivesDoor); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
+
+            InteractableDoor door = hit.collider.GetComponentInParent<InteractableDoor>();
+            if (door != null && door.enabled) { SetOnly(door: door); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
+
+            DoorWithTrap trapDoor = hit.collider.GetComponentInParent<DoorWithTrap>();
+            if (trapDoor != null) { SetOnly(trapDoor: trapDoor); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             Teleporter teleporter = hit.collider.GetComponent<Teleporter>();
-            if (teleporter != null) { SetOnly(teleporter: teleporter); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (teleporter != null) { SetOnly(teleporter: teleporter); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             InteractableObject obj = hit.collider.GetComponent<InteractableObject>();
-            if (obj != null) { SetOnly(obj: obj); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (obj != null) { SetOnly(obj: obj); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
-            HoldableItem holdable = hit.collider.GetComponent<HoldableItem>();
-            if (holdable != null && !holdable.IsBeingHeld() && holdable.enabled) { SetOnly(holdable: holdable); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            LightSwitchToggle lightSwitch = hit.collider.GetComponent<LightSwitchToggle>();
+            if (lightSwitch != null) { SetOnly(lightSwitch: lightSwitch); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
-            LightSwitchToggle lightSwitch = hit.collider
-                .GetComponent<LightSwitchToggle>();
-            if (lightSwitch != null) { SetOnly(lightSwitch: lightSwitch); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            LightSwitch lightSwitchNew = hit.collider.GetComponent<LightSwitch>();
+            if (lightSwitchNew != null) { SetOnly(lightSwitchNew: lightSwitchNew); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             FuseBoxPuzzle fuseBox = hit.collider.GetComponentInParent<FuseBoxPuzzle>();
-            if (fuseBox != null) { SetOnly(fuseBox: fuseBox); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (fuseBox != null) { SetOnly(fuseBox: fuseBox); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             CableSocket cableSocket = hit.collider.GetComponentInParent<CableSocket>();
-            if (cableSocket != null) { SetOnly(cable: null, cableSocket: cableSocket); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (cableSocket != null) { SetOnly(cableSocket: cableSocket); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             BookSlot bookSlot = hit.collider.GetComponent<BookSlot>();
-            if (bookSlot != null) { SetOnly(bookSlot: bookSlot); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (bookSlot != null) { SetOnly(bookSlot: bookSlot); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             BreakerSwitch breaker = hit.collider.GetComponentInParent<BreakerSwitch>();
-            if (breaker != null) { SetOnly(breaker: breaker); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (breaker != null) { SetOnly(breaker: breaker); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             ServerTerminal server = hit.collider.GetComponentInParent<ServerTerminal>();
-            if (server != null) { SetOnly(server: server); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (server != null) { SetOnly(server: server); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             LockedObject lockedObj = hit.collider.GetComponentInParent<LockedObject>();
-            if (lockedObj != null) { SetOnly(lockedObject: lockedObj); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (lockedObj != null) { SetOnly(lockedObject: lockedObj); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             KeycardDoor keycardDoor = hit.collider.GetComponentInParent<KeycardDoor>();
-            if (keycardDoor != null) { SetOnly(keycardDoor: keycardDoor); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (keycardDoor != null) { SetOnly(keycardDoor: keycardDoor); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             MaintenanceOverridePanel overridePanel = hit.collider.GetComponentInParent<MaintenanceOverridePanel>();
-            if (overridePanel != null) { SetOnly(overridePanel: overridePanel); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (overridePanel != null) { SetOnly(overridePanel: overridePanel); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
-            ChapterTransition chapterTransition = hit.collider
-                .GetComponent<ChapterTransition>();
-            if (chapterTransition != null) { SetOnly(chapterTransition: chapterTransition); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            ChapterTransition chapterTransition = hit.collider.GetComponent<ChapterTransition>();
+            if (chapterTransition != null) { SetOnly(chapterTransition: chapterTransition); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
-            Chapter4PuzzleChoice ch4Choice = hit.collider
-                .GetComponent<Chapter4PuzzleChoice>();
-            if (ch4Choice != null) { SetOnly(ch4Choice: ch4Choice); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            Chapter4PuzzleChoice ch4Choice = hit.collider.GetComponent<Chapter4PuzzleChoice>();
+            if (ch4Choice != null) { SetOnly(ch4Choice: ch4Choice); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
-            Chapter3To4Transition ch3to4 = hit.collider
-                .GetComponent<Chapter3To4Transition>();
-            if (ch3to4 != null) { SetOnly(ch3to4: ch3to4); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            Chapter3To4Transition ch3to4 = hit.collider.GetComponent<Chapter3To4Transition>();
+            if (ch3to4 != null) { SetOnly(ch3to4: ch3to4); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
 
             PatternAnchor pattern = hit.collider.GetComponent<PatternAnchor>();
-            if (pattern != null) { SetOnly(pattern: pattern); ShowInteractionPrompt(true); SetCrosshairInteract(); return; }
+            if (pattern != null) { SetOnly(pattern: pattern); ShowPrompt(interactTooltipText); SetCrosshairInteract(); return; }
         }
 
         ClearAll();
@@ -194,13 +218,19 @@ public class PlayerInteraction : MonoBehaviour
         SetCrosshairNormal();
     }
 
+    void ShowPrompt(string text)
+    {
+        if (interactionTooltip != null) interactionTooltip.text = text;
+        ShowInteractionPrompt(true);
+    }
+
     void SetOnly(
         InteractableDoor door = null,
         DoorWithTrap trapDoor = null,
         Teleporter teleporter = null,
         InteractableObject obj = null,
-        HoldableItem holdable = null,
         LightSwitchToggle lightSwitch = null,
+        LightSwitch lightSwitchNew = null,
         FuseBoxPuzzle fuseBox = null,
         CableConnectionPuzzle cable = null,
         CableSocket cableSocket = null,
@@ -218,12 +248,14 @@ public class PlayerInteraction : MonoBehaviour
         KeycardDoor keycardDoor = null,
         MaintenanceOverridePanel overridePanel = null)
     {
+        currentPickupItem = null;
+        currentPickupReset = null;
         currentDoor = door;
         currentTrapDoor = trapDoor;
         currentTeleporter = teleporter;
         currentObject = obj;
-        currentHoldableItem = holdable;
         currentLightSwitch = lightSwitch;
+        currentLightSwitchNew = lightSwitchNew;
         currentFuseBox = fuseBox;
         currentCable = cable;
         currentCableSocket = cableSocket;
@@ -242,7 +274,25 @@ public class PlayerInteraction : MonoBehaviour
         currentOverridePanel = overridePanel;
     }
 
-    void ClearAll() { SetOnly(); }
+    void ClearAll()
+    {
+        currentPickupItem = null;
+        currentPickupReset = null;
+        SetOnly();
+    }
+
+    public void HideUI()
+    {
+        if (interactionPrompt != null) interactionPrompt.SetActive(false);
+        if (interactionTooltip != null) interactionTooltip.gameObject.SetActive(false);
+        if (crosshairText != null) crosshairText.gameObject.SetActive(false);
+    }
+
+    public void RestoreUI()
+    {
+        if (crosshairText != null) crosshairText.gameObject.SetActive(true);
+        SetCrosshairNormal();
+    }
 
     void SetCrosshairNormal()
     {
